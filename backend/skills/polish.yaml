@@ -1,0 +1,37 @@
+id: polish
+name: 段落润色
+description: 对指定段落进行学术化润色和优化
+version: "1.0"
+category: polishing
+
+input:
+  - name: text
+    type: string
+    required: true
+    description: 待润色文本
+  - name: style
+    type: string
+    required: false
+    default: academic
+    description: 润色风格
+    options: [academic, concise, detailed]
+
+prompt_template: |
+  你是一位资深学术编辑。请对以下文本进行{{style}}风格的润色。
+  
+  {% if style == "academic" %}风格要求：学术化表达，使用规范术语，句式严谨{% endif %}
+  {% if style == "concise" %}风格要求：精简表达，去除冗余，保留核心信息{% endif %}
+  {% if style == "detailed" %}风格要求：扩充细节，增加论证深度，丰富例证{% endif %}
+  
+  原文：
+  {{text}}
+  
+  请输出润色后的文本，并简要说明主要修改点。
+
+output:
+  format: markdown
+  auto_save: false
+
+model_params:
+  temperature: 0.6
+  max_tokens: 3000

@@ -1,0 +1,50 @@
+id: body_writing
+name: 正文写作
+description: 根据章节标题和大纲生成正文段落
+version: "1.0"
+category: writing
+
+input:
+  - name: section_title
+    type: string
+    required: true
+    description: 当前章节标题
+  - name: word_count
+    type: integer
+    required: false
+    default: 2000
+    description: 目标字数
+
+context_vars:
+  - outline
+  - topic
+
+prompt_template: |
+  你是一位学术写作专家。请为以下论文章节撰写正文内容。
+  
+  {% if topic %}论文题目：{{topic}}{% endif %}
+  当前章节：{{section_title}}
+  目标字数：{{word_count}}字
+  
+  {% if outline %}
+  论文大纲：
+  {{outline | tojson(indent=2)}}
+  {% endif %}
+  
+  写作要求：
+  1. 紧扣章节主题，论点明确，论据充分
+  2. 论述逻辑清晰，层层递进
+  3. 适当使用学术术语和专业表达
+  4. 段落之间过渡自然
+  5. 重要观点后可加入"由此可见"、"综上所述"等过渡句
+  6. 使用 Markdown 格式，可用 ## 标注小节标题
+  
+  注意：不要重复引言或结论的内容，专注于本章节的核心论述。
+
+output:
+  format: markdown
+  auto_save: false
+
+model_params:
+  temperature: 0.7
+  max_tokens: 4000

@@ -1,0 +1,51 @@
+id: conclusion
+name: 结论写作
+description: 生成论文结论部分（总结、展望、不足）
+version: "1.0"
+category: writing
+
+input:
+  - name: topic
+    type: string
+    required: true
+    description: 论文题目
+  - name: word_count
+    type: integer
+    required: false
+    default: 1000
+    description: 结论字数
+
+context_vars:
+  - outline
+  - sections
+
+prompt_template: |
+  你是一位学术写作专家。请为以下论文撰写结论部分。
+  
+  论文题目：{{topic}}
+  目标字数：{{word_count}}字
+  
+  {% if outline %}
+  论文大纲：
+  {{outline | tojson(indent=2)}}
+  {% endif %}
+  
+  结论应包含以下要素：
+  1. 研究总结：概括本文的主要研究内容和核心发现（2-3段）
+  2. 研究贡献：明确本文的理论贡献和实践价值
+  3. 研究局限：诚实指出本研究的不足之处
+  4. 未来展望：提出后续研究的方向和建议
+  
+  写作要求：
+  - 不引入新的论点或数据
+  - 总结要有高度，避免简单重复正文
+  - 展望要具体可行
+  - 使用 Markdown 格式输出
+
+output:
+  format: markdown
+  auto_save: false
+
+model_params:
+  temperature: 0.6
+  max_tokens: 2000

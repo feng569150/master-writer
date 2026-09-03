@@ -1,0 +1,40 @@
+id: topic_analysis
+name: 选题分析
+description: 分析论文选题的可行性、创新点和研究价值
+version: "1.0"
+category: preparation
+
+input:
+  - name: topic
+    type: string
+    required: true
+    description: 论文题目
+  - name: field
+    type: string
+    required: false
+    default: ""
+    description: 所属学科领域
+
+prompt_template: |
+  你是一位资深的学术研究导师。请对以下论文选题进行全面分析。
+  
+  论文题目：{{topic}}
+  {% if field %}学科领域：{{field}}{% endif %}
+  
+  请从以下维度进行分析，并给出详细的评估报告：
+  
+  1. **可行性分析**：该选题是否具备研究条件？数据/资料是否可获取？
+  2. **创新性评估**：与现有研究相比，有何新意？创新程度如何？
+  3. **研究价值**：理论价值与实践价值分别是什么？
+  4. **研究建议**：推荐采用什么研究方法？可能的理论框架？
+  5. **风险提示**：可能遇到的困难与应对策略
+  
+  请用中文输出，结构清晰，每条分析不少于100字。
+
+output:
+  format: markdown
+  auto_save: false
+
+model_params:
+  temperature: 0.7
+  max_tokens: 2500

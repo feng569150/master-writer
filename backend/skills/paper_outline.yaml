@@ -1,0 +1,72 @@
+id: paper_outline
+name: 论文大纲生成
+description: 根据论文题目和类型生成结构化的三级大纲
+version: "1.0"
+category: preparation
+
+input:
+  - name: topic
+    type: string
+    required: true
+    description: 论文题目
+  - name: paper_type
+    type: string
+    required: true
+    default: bachelor_thesis
+    description: 论文类型
+    options: [bachelor_thesis, course_paper, literature_review]
+  - name: word_count
+    type: integer
+    required: false
+    default: 10000
+    description: 预期字数
+
+context_vars:
+  - outline
+
+prompt_template: |
+  你是一位资深的学术论文写作专家，擅长为{{paper_type}}生成严谨的结构化大纲。
+  
+  论文题目：{{topic}}
+  预期字数：{{word_count}}字
+  
+  请生成一个三级大纲，要求：
+  1. 逻辑清晰，层次分明
+  2. 覆盖论文应有的完整结构
+  3. 各部分字数分配合理
+  4. 使用学术化的章节标题
+  
+  请严格按照以下 JSON 格式输出，不要输出其他内容：
+  {
+    "title": "论文标题",
+    "sections": [
+      {
+        "level": 1,
+        "title": "一级标题",
+        "word_count": 预计字数,
+        "children": [
+          {
+            "level": 2,
+            "title": "二级标题",
+            "word_count": 预计字数,
+            "children": [
+              {
+                "level": 3,
+                "title": "三级标题",
+                "word_count": 预计字数
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+
+output:
+  format: json
+  auto_save: true
+  save_target: outline
+
+model_params:
+  temperature: 0.7
+  max_tokens: 3000

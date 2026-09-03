@@ -1,0 +1,62 @@
+"""
+模板引擎单元测试
+"""
+
+import os
+import sys
+import unittest
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import tests._base  # noqa: F401  (设置临时数据目录)
+
+import asyncio
+from backend.app.services.template_engine import TemplateEngine
+from backend.app.services.template_parser import TemplateParser
+from backend.app.database import db
+
+
+class TemplateEngineTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        async def _init():
+            await db.init()
+            await TemplateEngine.initialize()
+
+        asyncio.run(_init())
+
+    def test_default_template_always_exists(self):
+        """默认模板必须存在"""
+        template = TemplateEngine.get("default")
+        self.assertIsNotNone(template, "缺少默认模板")
+        self.assertEqual(template.name, "默认模板")
+
+    def test_builtin_templates_loaded(self):
+        """内置模板应加载"""
+        self.assertIsNotNone(TemplateEngine.get("bachelor_thesis"))
+        self.assertIsNotNone(TemplateEngine.get("course_paper"))
+
+    def test_default_template_uses_mainstream_format(self):
+        """默认模板应符合主流中文论文格式"""
+        t = TemplateEngine.get("default")
+        self.assertEqual(t.page.width, 21.0, "A4 宽度")
+        self.assertEqual(t.page.height, 29.7, "A4 高度")
+        self.assertEqual(t.fonts.chinese, "宋体", "正文中文字体应为宋体")
+        self.assertEqual(t.fonts.size, 12, "小四号=12pt")
+        self.assertEqual(t.paragraph.line_spacing, 1.5, "1.5倍行距")
+        self.assertAlmostEqual(t.paragraph.first_line_indent, 0.74, places=1, msg="首行缩进2字符≈0.74cm")
+        self.assertEqual(t.headings["1"].font, "黑体")
+
+    def test_parser_reads_docx(self):
+        """解析器应能从 docx 中提取配置"""
+        config = TemplateParser.get_default_template()
+        self.assertEqual(config["fonts"]["chinese"], "宋体")
+        self.assertIn("1", config["headings"])
+
+    def test_list_all_returns_templates(self):
+        """列表接口返回模板响应"""
+        result = TemplateEngine.list_all()
+        self.assertGreaterEqual(len(result), 3)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

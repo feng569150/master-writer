@@ -1,0 +1,61 @@
+{
+    "id": "bachelor_thesis",
+    "name": "本科毕业论文",
+    "description": "标准本科毕业论文格式（中文）",
+    "page": {
+        "width": 21.0,
+        "height": 29.7,
+        "margin_top": 2.54,
+        "margin_bottom": 2.54,
+        "margin_left": 3.17,
+        "margin_right": 3.17
+    },
+    "fonts": {
+        "chinese": "宋体",
+        "english": "Times New Roman",
+        "size": 12,
+        "heading_font": "黑体",
+        "heading_english": "Arial"
+    },
+    "paragraph": {
+        "line_spacing": 1.5,
+        "first_line_indent": 0.74,
+        "space_before": 0,
+        "space_after": 0,
+        "alignment": "justify"
+    },
+    "headings": {
+        "1": {
+            "level": 1,
+            "font": "黑体",
+            "font_en": "Arial",
+            "size": 16,
+            "bold": true,
+            "alignment": "center",
+            "space_before": 24,
+            "space_after": 12
+        },
+        "2": {
+            "level": 2,
+            "font": "黑体",
+            "font_en": "Arial",
+            "size": 14,
+            "bold": true,
+            "alignment": "left",
+            "space_before": 18,
+            "space_after": 6
+        },
+        "3": {
+            "level": 3,
+            "font": "黑体",
+            "font_en": "Arial",
+            "size": 12,
+            "bold": true,
+            "alignment": "left",
+            "space_before": 12,
+            "space_after": 6
+        }
+    },
+    "supports_toc": true,
+    "supports_abstract": true
+}

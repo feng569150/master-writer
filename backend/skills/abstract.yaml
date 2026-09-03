@@ -1,0 +1,51 @@
+id: abstract
+name: 摘要生成
+description: 基于全文生成中英文摘要和关键词
+version: "1.0"
+category: writing
+
+input:
+  - name: full_text
+    type: string
+    required: true
+    description: 论文全文内容
+  - name: word_count
+    type: integer
+    required: false
+    default: 400
+    description: 中文摘要字数
+
+context_vars:
+  - topic
+
+prompt_template: |
+  你是一位学术写作专家。请根据以下论文全文，生成中英文摘要和关键词。
+  
+  {% if topic %}论文题目：{{topic}}{% endif %}
+  中文摘要目标字数：{{word_count}}字
+  
+  论文全文：
+  {{full_text[:8000] if full_text else ""}}
+  
+  请严格按照以下 JSON 格式输出：
+  {
+    "chinese": "中文摘要...",
+    "english": "English abstract...",
+    "keywords_zh": ["关键词1", "关键词2", "关键词3", "关键词4", "关键词5"],
+    "keywords_en": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]
+  }
+  
+  摘要写作要求：
+  - 中文摘要应包含：研究背景、研究目的、研究方法、主要结果、研究结论
+  - 英文摘要与中文摘要对应，保持内容一致
+  - 关键词 3-5 个，反映论文核心主题
+  - 不使用"本文"、"笔者"等主语，采用第三人称被动语态
+
+output:
+  format: json
+  auto_save: true
+  save_target: abstract
+
+model_params:
+  temperature: 0.5
+  max_tokens: 2000

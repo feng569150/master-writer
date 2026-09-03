@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 运行时数据（本地数据库、查重库、用户上传）
+data/
+*.sqlite
+*.sqlite3
+*.db
+
+# 测试与日志
+server.log
+*.log
+test_out.txt
+
+# 导出产物
+*.docx
+*.pdf
+e2e_test_output.docx
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# 环境变量
+.env

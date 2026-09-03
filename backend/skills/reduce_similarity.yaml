@@ -1,0 +1,40 @@
+id: reduce_similarity
+name: 降重改写
+description: 对高相似度段落进行改写以降低重复率
+version: "1.0"
+category: polishing
+
+input:
+  - name: text
+    type: string
+    required: true
+    description: 待降重文本
+  - name: target_similarity
+    type: float
+    required: false
+    default: 0.1
+    description: 目标相似度
+
+prompt_template: |
+  你是一位学术写作专家，擅长在不改变原意的前提下改写文本以降低重复率。
+  
+  请对以下文本进行深度改写，要求：
+  1. 保持原意不变，核心观点完整保留
+  2. 大幅度调整句式结构，改变语序
+  3. 使用同义词替换，变换表达方式
+  4. 合并或拆分句子，增加过渡衔接
+  5. 适当增加自己的分析性语言
+  6. 目标：改写后与原文的字符相似度低于10%
+  
+  原文：
+  {{text}}
+  
+  请直接输出改写后的文本，不要输出解释说明。
+
+output:
+  format: text
+  auto_save: false
+
+model_params:
+  temperature: 0.8
+  max_tokens: 3000

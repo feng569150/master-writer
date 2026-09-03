@@ -1,0 +1,52 @@
+id: introduction
+name: 引言写作
+description: 生成论文引言部分（研究背景、意义、现状、本文工作）
+version: "1.0"
+category: writing
+
+input:
+  - name: topic
+    type: string
+    required: true
+    description: 论文题目
+  - name: word_count
+    type: integer
+    required: false
+    default: 1500
+    description: 引言字数
+
+context_vars:
+  - outline
+
+prompt_template: |
+  你是一位学术写作专家。请为以下论文撰写引言部分。
+  
+  论文题目：{{topic}}
+  目标字数：{{word_count}}字
+  
+  {% if outline %}
+  论文大纲：
+  {{outline | tojson(indent=2)}}
+  {% endif %}
+  
+  引言应包含以下要素：
+  1. 研究背景：从宏观到微观，介绍研究领域的重要性
+  2. 研究意义：理论意义与实践意义
+  3. 研究现状：国内外研究进展概述（综述已有工作）
+  4. 研究问题：指出现有研究的不足或空白
+  5. 本文工作：简要介绍本文的研究内容、方法和创新点
+  6. 论文结构：简述各章节安排
+  
+  写作要求：
+  - 学术性强，逻辑严密
+  - 引用观点需标注（如：[1]、[2]）
+  - 语言流畅，避免口语化
+  - 使用 Markdown 格式输出
+
+output:
+  format: markdown
+  auto_save: false
+
+model_params:
+  temperature: 0.7
+  max_tokens: 3000

@@ -1,0 +1,51 @@
+{
+    "id": "course_paper",
+    "name": "课程论文",
+    "description": "通用课程论文格式",
+    "page": {
+        "width": 21.0,
+        "height": 29.7,
+        "margin_top": 2.54,
+        "margin_bottom": 2.54,
+        "margin_left": 3.17,
+        "margin_right": 3.17
+    },
+    "fonts": {
+        "chinese": "宋体",
+        "english": "Times New Roman",
+        "size": 12,
+        "heading_font": "黑体",
+        "heading_english": "Arial"
+    },
+    "paragraph": {
+        "line_spacing": 1.5,
+        "first_line_indent": 0.74,
+        "space_before": 0,
+        "space_after": 0,
+        "alignment": "justify"
+    },
+    "headings": {
+        "1": {
+            "level": 1,
+            "font": "黑体",
+            "font_en": "Arial",
+            "size": 14,
+            "bold": true,
+            "alignment": "center",
+            "space_before": 18,
+            "space_after": 12
+        },
+        "2": {
+            "level": 2,
+            "font": "黑体",
+            "font_en": "Arial",
+            "size": 12,
+            "bold": true,
+            "alignment": "left",
+            "space_before": 12,
+            "space_after": 6
+        }
+    },
+    "supports_toc": false,
+    "supports_abstract": false
+}

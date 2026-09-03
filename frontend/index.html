@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MasterWriter - 智能论文写作助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <nav class="navbar">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="navbar-brand">
+                    <div class="navbar-brand-icon">
+                        <i class="fas fa-graduation-cap"></i>
+                    </div>
+                    <span class="navbar-brand-text">MasterWriter</span>
+                    <span class="badge">本地版</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="app.showSettings()" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-cog"></i> 设置
+                    </button>
+                    <button onclick="app.showHelp()" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-question-circle"></i> 帮助
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="grid grid-cols-12 gap-6">
+            <!-- 左侧导航 -->
+            <div class="col-span-12 lg:col-span-3">
+                <div class="sidebar">
+                    <div class="p-4 border-b border-gray-100">
+                        <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">主菜单</h3>
+                    </div>
+                    <nav class="py-2">
+                        <button onclick="app.switchTab('dashboard')" class="nav-btn active" data-tab="dashboard">
+                            <i class="fas fa-home"></i> 工作台
+                        </button>
+                        <button onclick="app.switchTab('papers')" class="nav-btn" data-tab="papers">
+                            <i class="fas fa-file-alt"></i> 我的论文
+                        </button>
+                        <button onclick="app.switchTab('writing')" class="nav-btn" data-tab="writing">
+                            <i class="fas fa-pen"></i> 写作
+                        </button>
+                        <button onclick="app.switchTab('plagiarism')" class="nav-btn" data-tab="plagiarism">
+                            <i class="fas fa-search"></i> 论文查重
+                        </button>
+                        <button onclick="app.switchTab('library')" class="nav-btn" data-tab="library">
+                            <i class="fas fa-book"></i> 查重库
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- 模型状态 -->
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3">系统状态</h4>
+                        <div id="model-status">
+                            <div class="status-row mb-2">
+                                <span class="status-dot"></span>
+                                <span>服务检查中...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 主内容区 -->
+            <div class="col-span-12 lg:col-span-9">
+                
+                <!-- 工作台 -->
+                <div id="tab-dashboard" class="tab-content">
+                    <div class="card">
+                        <div class="card-body text-center py-12">
+                            <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                                <i class="fas fa-graduation-cap text-white text-3xl"></i>
+                            </div>
+                            <h2 class="text-2xl font-bold text-gray-900 mb-2">开始你的论文写作</h2>
+                            <p class="text-gray-500 mb-8 max-w-md mx-auto">结构化生成、自动排版、本地查重，让论文写作更高效</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto mb-8">
+                                <div class="p-5 bg-blue-50 rounded-xl border border-blue-100">
+                                    <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                                        <i class="fas fa-file-word text-blue-600"></i>
+                                    </div>
+                                    <h3 class="font-semibold text-gray-900">格式标准化</h3>
+                                    <p class="text-sm text-gray-500 mt-1">上传模板自动解析，生成即合规</p>
+                                </div>
+                                <div class="p-5 bg-green-50 rounded-xl border border-green-100">
+                                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                                        <i class="fas fa-brain text-green-600"></i>
+                                    </div>
+                                    <h3 class="font-semibold text-gray-900">结构化写作</h3>
+                                    <p class="text-sm text-gray-500 mt-1">分步生成，质量可控</p>
+                                </div>
+                                <div class="p-5 bg-purple-50 rounded-xl border border-purple-100">
+                                    <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                                        <i class="fas fa-shield-alt text-purple-600"></i>
+                                    </div>
+                                    <h3 class="font-semibold text-gray-900">本地查重</h3>
+                                    <p class="text-sm text-gray-500 mt-1">零成本，可接第三方API</p>
+                                </div>
+                            </div>
+                            
+                            <button onclick="app.createNewPaper()" class="btn btn-primary btn-lg">
+                                <i class="fas fa-plus"></i> 新建论文
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 我的论文 -->
+                <div id="tab-papers" class="tab-content hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">我的论文</h2>
+                            <div class="flex gap-2">
+                                <button onclick="app.showModal('modal-upload-template')" class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-upload"></i> 上传模板
+                                </button>
+                                <button onclick="app.createNewPaper()" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-plus"></i> 新建论文
+                                </button>
+                            </div>
+                        </div>
+                        <div id="papers-list" class="divide-y divide-gray-100">
+                            <div class="empty-state">
+                                <div class="empty-state-icon"><i class="fas fa-inbox"></i></div>
+                                <p>加载中...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 写作 -->
+                <div id="tab-writing" class="tab-content hidden">
+                    <div id="writing-workspace">
+                        <div class="card">
+                            <div class="card-body text-center py-12">
+                                <div class="empty-state-icon"><i class="fas fa-pen-fancy"></i></div>
+                                <h3 class="text-lg font-semibold text-gray-700 mb-2">选择一篇论文开始写作</h3>
+                                <p class="text-gray-500 mb-4">在"我的论文"中选择，或点击下方按钮创建新论文</p>
+                                <button onclick="app.switchTab('papers')" class="btn btn-primary btn-sm">去选择论文</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 查重 -->
+                <div id="tab-plagiarism" class="tab-content hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">论文查重</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-4">
+                                <label class="form-label">待查重文本</label>
+                                <textarea id="plagiarism-text" class="textarea" rows="10" placeholder="粘贴论文内容到这里..."></textarea>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+                                <div>
+                                    <label class="form-label">相似度阈值</label>
+                                    <select id="plagiarism-threshold" class="select">
+                                        <option value="0.2">20% (严格)</option>
+                                        <option value="0.3" selected>30% (推荐)</option>
+                                        <option value="0.5">50% (宽松)</option>
+                                    </select>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="form-label">查重模式</label>
+                                    <div class="flex gap-2">
+                                        <button onclick="app.checkPlagiarism('local')" class="btn btn-purple flex-1">
+                                            <i class="fas fa-search"></i> 本地库查重
+                                        </button>
+                                        <button onclick="app.checkPlagiarism('external')" class="btn btn-secondary flex-1">
+                                            <i class="fas fa-external-link-alt"></i> 第三方查重
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="plagiarism-result" class="hidden">
+                                <!-- 查重结果 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 论文库 -->
+                <div id="tab-library" class="tab-content hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">查重论文库</h2>
+                            <button onclick="app.showAddLibraryModal()" class="btn btn-success btn-sm">
+                                <i class="fas fa-plus"></i> 添加文档
+                            </button>
+                        </div>
+                        <div id="library-list" class="divide-y divide-gray-100">
+                            <div class="empty-state">
+                                <div class="empty-state-icon"><i class="fas fa-book"></i></div>
+                                <p>加载中...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建论文弹窗 -->
+    <div id="modal-new-paper" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">新建论文</h3>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <label class="form-label">论文题目</label>
+                    <input type="text" id="new-paper-title" class="input" placeholder="请输入论文题目">
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">模板</label>
+                    <select id="new-paper-template" class="select">
+                        <option value="default">默认模板（主流论文格式）</option>
+                        <option value="bachelor_thesis">本科毕业论文</option>
+                        <option value="course_paper">课程论文</option>
+                    </select>
+                </div>
+                <div class="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    也可在"我的论文"中上传自己的 Word 模板
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="app.closeModal('modal-new-paper')" class="btn btn-secondary">取消</button>
+                <button onclick="app.confirmCreatePaper()" class="btn btn-primary">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 上传模板弹窗 -->
+    <div id="modal-upload-template" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">上传模板</h3>
+            </div>
+            <div class="modal-body">
+                <div id="upload-zone" class="upload-zone mb-4">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
+                    <p class="text-gray-600 font-medium">点击或拖拽上传 .docx 模板</p>
+                    <p class="text-sm text-gray-400 mt-1">系统会自动解析字体、行距、标题样式</p>
+                    <input type="file" id="template-file-input" accept=".docx" class="hidden">
+                </div>
+                <div id="upload-preview" class="hidden bg-gray-50 p-3 rounded-lg text-sm text-gray-600">
+                    <!-- 解析结果预览 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="app.closeModal('modal-upload-template')" class="btn btn-secondary">取消</button>
+                <button onclick="app.confirmUploadTemplate()" class="btn btn-primary">使用此模板</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加论文库弹窗 -->
+    <div id="modal-add-library" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">添加文档到查重库</h3>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <label class="form-label">标题</label>
+                    <input type="text" id="library-title" class="input" placeholder="文档标题">
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">内容</label>
+                    <textarea id="library-content" class="textarea" rows="6" placeholder="粘贴文档内容..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="app.closeModal('modal-add-library')" class="btn btn-secondary">取消</button>
+                <button onclick="app.confirmAddLibrary()" class="btn btn-success">添加</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div id="modal-settings" class="modal-overlay hidden">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3 class="modal-title">设置</h3>
+            </div>
+            <div class="modal-body">
+                <div class="mb-5">
+                    <h4 class="text-sm font-semibold text-gray-900 mb-3">AI 模型配置</h4>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="form-label">默认模型</label>
+                            <select id="setting-provider" class="select">
+                                <option value="mock">本地模拟（无需 Key）</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="zhipu">智谱 AI</option>
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="ollama">Ollama (本地)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">API Key</label>
+                            <input type="password" id="setting-apikey" class="input" placeholder="输入 API Key">
+                        </div>
+                        <div>
+                            <label class="form-label">模型名称</label>
+                            <input type="text" id="setting-model" class="input" placeholder="如: gpt-4o-mini">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="border-t border-gray-100 pt-4">
+                    <h4 class="text-sm font-semibold text-gray-900 mb-3">外部查重 API（可选）</h4>
+                    <p class="text-sm text-gray-500 mb-3">如需对标知网，可配置第三方查重服务（需自费）</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="form-label">PaperPass API Key</label>
+                            <input type="password" id="setting-paperpass-key" class="input" placeholder="可选">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="app.closeModal('modal-settings')" class="btn btn-secondary">取消</button>
+                <button onclick="app.saveSettings()" class="btn btn-primary">保存设置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast toast-info">
+        <i class="fas fa-info-circle"></i>
+        <span id="toast-message"></span>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
