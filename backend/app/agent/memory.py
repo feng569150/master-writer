@@ -53,13 +53,21 @@ class PaperMemory:
         return None
     
     def update_section(self, section_type: str, title: str, content: str):
-        """更新或添加章节"""
+        """更新或添加章节：优先按类型+标题匹配，其次按标题匹配，最后追加"""
+        # 1. 类型 + 标题都匹配
         for s in self.sections:
-            if s.get("type") == section_type:
-                s["title"] = title
+            if s.get("type") == section_type and s.get("title") == title:
                 s["content"] = content
                 s["updated_at"] = datetime.now().isoformat()
                 return
+        # 2. 仅标题匹配（如不同章节类型但同名）
+        for s in self.sections:
+            if s.get("title") == title:
+                s["type"] = section_type
+                s["content"] = content
+                s["updated_at"] = datetime.now().isoformat()
+                return
+        # 3. 追加新章节
         self.sections.append({
             "type": section_type,
             "title": title,

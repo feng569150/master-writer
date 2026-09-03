@@ -355,6 +355,10 @@ const app = {
                                 <i class="fas fa-compress text-pink-600"></i>
                                 <span>摘要</span>
                             </button>
+                            <button onclick="app.runSkill('references')" class="tool-btn">
+                                <i class="fas fa-book-open text-indigo-600"></i>
+                                <span>参考文献</span>
+                            </button>
                             <button onclick="app.runPipeline('full_paper')" class="tool-btn" style="border-color:#bfdbfe;background:#eff6ff">
                                 <i class="fas fa-magic text-blue-600"></i>
                                 <span>一键成文</span>
@@ -380,13 +384,19 @@ const app = {
                     <div class="outline-panel">
                         <div class="flex justify-between items-center mb-3">
                             <h3 class="font-semibold text-gray-700">大纲</h3>
-                            <button onclick="app.runSkill('paper_outline')" class="text-xs text-blue-600 hover:text-blue-800">
-                                <i class="fas fa-sync-alt"></i>
-                            </button>
+                            <div class="flex gap-1">
+                                <button onclick="app.runSkill('paper_outline')" class="text-xs text-blue-600 hover:text-blue-800" title="重新生成">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                                <button onclick="app.toggleOutlineEdit()" class="text-xs text-gray-500 hover:text-gray-700" title="编辑大纲" id="outline-edit-btn">
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                            </div>
                         </div>
                         <div id="outline-tree" class="text-sm text-gray-600">
                             ${this.renderOutlineTree(paper.outline)}
                         </div>
+                        <div id="outline-editor" class="hidden"></div>
                     </div>
                     <div class="editor-panel">
                         <div class="editor-toolbar">
@@ -449,18 +459,144 @@ const app = {
                         onchange="app.updateSection('${s.id}', 'title', this.value)"
                         class="font-medium text-gray-900 bg-transparent border-none focus:outline-none focus:ring-0 w-full" 
                         placeholder="章节标题">
-                    <div class="flex gap-1 ml-2">
+                    <div class="flex gap-1 ml-2 items-center">
+                        ${s.type !== 'abstract' && s.type !== 'references' ? `
+                        <button onclick="app.toggleSectionPreview('${s.id}', this)" class="text-gray-400 hover:text-blue-600 text-xs" title="预览">
+                            <i class="fas fa-eye"></i>
+                        </button>` : ''}
                         <button onclick="app.moveSection('${s.id}', -1)" class="text-gray-400 hover:text-gray-600" ${i === 0 ? 'disabled' : ''}><i class="fas fa-chevron-up"></i></button>
                         <button onclick="app.moveSection('${s.id}', 1)" class="text-gray-400 hover:text-gray-600" ${i === sections.length - 1 ? 'disabled' : ''}><i class="fas fa-chevron-down"></i></button>
                         <button onclick="app.deleteSection('${s.id}')" class="text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>
                     </div>
                 </div>
-                <textarea 
+                <textarea id="sec-text-${s.id}"
                     onchange="app.updateSection('${s.id}', 'content', this.value)"
                     class="w-full text-sm text-gray-700 border border-gray-200 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
                     rows="5" placeholder="章节内容...">${this.escapeHtml(s.content || '')}</textarea>
+                <div id="sec-preview-${s.id}" class="hidden border border-gray-200 rounded-lg p-3 text-sm text-gray-700 prose-view"></div>
             </div>
         `).join('');
+    },
+
+    toggleSectionPreview(id, btn) {
+        const textEl = document.getElementById(`sec-text-${id}`);
+        const prevEl = document.getElementById(`sec-preview-${id}`);
+        const isPreview = prevEl.classList.contains('hidden');
+        if (isPreview) {
+            prevEl.innerHTML = this.mdToHtml(textEl.value);
+            prevEl.classList.remove('hidden');
+            textEl.classList.add('hidden');
+            btn.innerHTML = '<i class="fas fa-pen"></i>';
+        } else {
+            prevEl.classList.add('hidden');
+            textEl.classList.remove('hidden');
+            btn.innerHTML = '<i class="fas fa-eye"></i>';
+        }
+    },
+
+    mdToHtml(md) {
+        if (!md) return '<span class="text-gray-400">（空内容）</span>';
+        const esc = (t) => {
+            const div = document.createElement('div');
+            div.textContent = t;
+            return div.innerHTML;
+        };
+        const lines = md.split('\n');
+        let html = '';
+        let inList = false;
+        const closeList = () => { if (inList) { html += '</ul>'; inList = false; } };
+        for (let raw of lines) {
+            const line = raw.trim();
+            if (!line) { closeList(); continue; }
+            // 标题
+            const h = line.match(/^(#{1,4})\s+(.+)/);
+            if (h) {
+                closeList();
+                const lv = h[1].length;
+                const cls = lv === 1 ? 'text-lg font-bold' : lv === 2 ? 'text-base font-bold' : 'text-sm font-semibold';
+                html += `<div class="${cls} mt-2">${esc(h[2])}</div>`;
+                continue;
+            }
+            // 列表
+            if (/^[-*]\s+/.test(line)) {
+                if (!inList) { html += '<ul class="list-disc ml-5">'; inList = true; }
+                html += `<li>${esc(line.replace(/^[-*]\s+/, ''))}</li>`;
+                continue;
+            }
+            closeList();
+            // 加粗/斜体
+            let t = esc(line);
+            t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>');
+            html += `<p class="mb-2 leading-relaxed">${t}</p>`;
+        }
+        closeList();
+        return html;
+    },
+
+    toggleOutlineEdit() {
+        const tree = document.getElementById('outline-tree');
+        const editor = document.getElementById('outline-editor');
+        const paper = this.state.currentPaper;
+        if (!paper || !paper.outline) return;
+        if (editor.classList.contains('hidden')) {
+            // 进入编辑模式
+            const renderNodeEdit = (node, level) => {
+                const cls = level === 0 ? ['w-full font-medium', 'text-gray-800'] : ['w-full ml-' + (level * 4), 'text-gray-600'];
+                let html = `<div class="flex items-center gap-1 mb-1">`;
+                html += `<span class="text-gray-400 text-xs">${'　'.repeat(level)}${node.level || level + 1}.</span>`;
+                html += `<input class="outline-title-input flex-1 border border-gray-200 rounded px-2 py-1 text-sm" value="${this.escapeHtml(node.title || '')}" data-path="${this.outlinePath(node)}">`;
+                html += `</div>`;
+                if (node.children) html += node.children.map(c => renderNodeEdit(c, level + 1)).join('');
+                return html;
+            };
+            const list = paper.outline.sections || [];
+            editor.innerHTML = list.map(n => renderNodeEdit(n, 0)).join('') +
+                '<div class="mt-3 flex gap-2"><button onclick="app.saveOutlineEdit()" class="btn btn-primary btn-sm">保存大纲</button>' +
+                '<button onclick="app.cancelOutlineEdit()" class="btn btn-secondary btn-sm">取消</button></div>';
+            editor.classList.remove('hidden');
+            tree.classList.add('hidden');
+        }
+    },
+
+    outlinePath(node) {
+        // 生成节点路径标识（用标题关联）
+        return node.title;
+    },
+
+    async saveOutlineEdit() {
+        const paper = this.state.currentPaper;
+        const titleMap = {};
+        document.querySelectorAll('.outline-title-input').forEach(inp => {
+            titleMap[inp.dataset.path] = inp.value.trim();
+        });
+        // 更新大纲对象中的标题
+        const updateTitles = (nodes) => {
+            nodes.forEach(n => {
+                if (titleMap[n.title] !== undefined) {
+                    n.title = titleMap[n.title];
+                }
+                if (n.children) updateTitles(n.children);
+            });
+        };
+        updateTitles(paper.outline.sections || []);
+        // 保存
+        const res = await this.api(`/api/papers/${paper.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ outline: paper.outline })
+        });
+        if (res.success) {
+            this.showToast('大纲已保存');
+            await this.selectPaper(paper.id);
+        } else {
+            this.showToast('保存失败', 'error');
+        }
+    },
+
+    cancelOutlineEdit() {
+        const tree = document.getElementById('outline-tree');
+        const editor = document.getElementById('outline-editor');
+        editor.classList.add('hidden');
+        tree.classList.remove('hidden');
     },
 
     async addSection() {
@@ -551,6 +687,10 @@ const app = {
             inputs.word_count = 2000;
         } else if (skillId === 'abstract') {
             inputs.full_text = (paper.sections || []).map(s => s.content).join('\n\n');
+        } else if (skillId === 'references') {
+            inputs.topic = paper.title;
+            inputs.full_text = (paper.sections || []).map(s => s.content).join('\n\n');
+            inputs.count = 10;
         } else if (skillId === 'polish' || skillId === 'reduce_similarity') {
             const text = prompt('请输入要处理的文本：');
             if (!text) return null;

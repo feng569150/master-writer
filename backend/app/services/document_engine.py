@@ -3,6 +3,7 @@
 将论文内容转换为格式化的 Word 文档
 """
 
+import json
 import re
 import io
 from typing import List, Optional, Dict
@@ -240,6 +241,11 @@ class DocumentEngine:
         content = _get("content") or ""
         lines = content.split("\n")
 
+        # 参考文献章节：解析 JSON 并格式化导出
+        if _get("type") == "references":
+            DocumentEngine._add_references(doc, content, template)
+            return
+
         # 章节标题（如果用 style 写标题内容）
         sec_title = (_get("title") or "").strip()
         if sec_title and not any(l.strip().startswith("#") for l in lines[:3]):
@@ -268,6 +274,50 @@ class DocumentEngine:
             # 普通段落
             p = doc.add_paragraph(line)
             DocumentEngine._apply_paragraph_style(p, template)
+
+    @staticmethod
+    def _add_references(doc: Document, content: str, template: TemplateConfig):
+        """添加参考文献列表（悬挂缩进）"""
+        # 解析 JSON 数组
+        refs = []
+        try:
+            data = json.loads(content)
+            if isinstance(data, list):
+                refs = data
+            elif isinstance(data, dict) and isinstance(data.get("references"), list):
+                refs = data["references"]
+        except (json.JSONDecodeError, TypeError):
+            # 非 JSON，按行处理
+            for line in content.split("\n"):
+                line = line.strip()
+                if line:
+                    refs.append({"formatted": line})
+
+        if not refs:
+            return
+
+        # 参考文献标题
+        DocumentEngine._add_heading(doc, "参考文献", template, "1")
+
+        for ref in refs:
+            formatted = ""
+            if isinstance(ref, dict):
+                formatted = ref.get("formatted", "") or ""
+                if not formatted:
+                    formatted = f"{ref.get('cite', '')} {ref.get('author', '')} {ref.get('title', '')} {ref.get('source', '')} {ref.get('year', '')}".strip()
+            else:
+                formatted = str(ref)
+
+            if not formatted:
+                continue
+
+            p = doc.add_paragraph(formatted)
+            DocumentEngine._apply_paragraph_style(p, template)
+            # 悬挂缩进：首行缩进 0，左缩进 0.74cm
+            pf = p.paragraph_format
+            pf.first_line_indent = Cm(0)
+            pf.left_indent = Cm(0.74)
+            pf.line_spacing = 1.25
 
     @staticmethod
     def to_bytes(doc: Document) -> bytes:

@@ -9,6 +9,10 @@ input:
     type: string
     required: true
     description: 当前章节标题
+  - name: section_outline
+    type: object
+    required: false
+    description: 当前章节的大纲结构（含子标题）
   - name: word_count
     type: integer
     required: false
@@ -31,13 +35,19 @@ prompt_template: |
   {{outline | tojson(indent=2)}}
   {% endif %}
   
+  {% if section_outline %}
+  本章节大纲结构：
+  {{section_outline | tojson(indent=2)}}
+  {% endif %}
+  
   写作要求：
   1. 紧扣章节主题，论点明确，论据充分
-  2. 论述逻辑清晰，层层递进
-  3. 适当使用学术术语和专业表达
-  4. 段落之间过渡自然
-  5. 重要观点后可加入"由此可见"、"综上所述"等过渡句
-  6. 使用 Markdown 格式，可用 ## 标注小节标题
+  2. 若本章节大纲包含子标题，必须为每个子标题生成独立小节（用 ##、### 标注）
+  3. 论述逻辑清晰，层层递进
+  4. 适当使用学术术语和专业表达
+  5. 段落之间过渡自然
+  6. 重要观点后可加入"由此可见"、"综上所述"等过渡句
+  7. 使用 Markdown 格式，可用 ## 标注小节标题
   
   注意：不要重复引言或结论的内容，专注于本章节的核心论述。
 

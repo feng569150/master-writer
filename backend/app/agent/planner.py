@@ -65,19 +65,14 @@ class Planner:
                 }
             },
             {
-                "skill": "introduction",
-                "needs": ["outline"],
-                "save_to": "sections.引言"
-            },
-            {
-                "skill": "conclusion",
-                "needs": ["outline", "sections"],
-                "save_to": "sections.结论"
-            },
-            {
                 "skill": "abstract",
                 "needs": ["sections"],
                 "save_to": "abstract"
+            },
+            {
+                "skill": "references",
+                "needs": ["sections", "outline"],
+                "save_to": "references"
             }
         ],
         "outline_only": [

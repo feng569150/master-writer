@@ -17,6 +17,7 @@ input:
 
 context_vars:
   - topic
+  - full_text
 
 prompt_template: |
   你是一位学术写作专家。请根据以下论文全文，生成中英文摘要和关键词。

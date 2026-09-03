@@ -77,8 +77,15 @@ class WritingAgent:
         context.update(inputs)
         
         total_steps = len(steps)
-        
+
         for i, step in enumerate(steps):
+            # 刷新上下文：前序 Skill 可能已更新 memory
+            for key in ("outline", "sections", "references"):
+                context[key] = getattr(self.memory, key, None)
+            context["full_text"] = "\n\n".join(
+                s.get("content", "") for s in (self.memory.sections if self.memory else [])
+            )
+
             # 发送进度
             progress = {
                 "type": "progress",
@@ -113,21 +120,35 @@ class WritingAgent:
             resolved_inputs = {}
             for key, val in step.inputs.items():
                 resolved_inputs[key] = Planner.resolve_value(val, context)
-            
+
+            # 收集输出，同时流式转发
+            buffer = ""
             async for chunk in SkillExecutor.execute(
                 step.skill_id,
                 self.memory,
                 resolved_inputs,
-                stream
+                stream=True,
             ):
+                buffer += chunk
                 yield chunk
-            
-            # 如果需要保存，更新 context
+
+            # Pipeline 级保存：save_to 覆盖 Skill 自身配置
             if step.save_to:
-                # 简化处理：只支持保存到 outline/abstract/sections.xxx
-                pass
-        
+                try:
+                    skill = SkillEngine.get_skill(step.skill_id)
+                    output_format = skill.output.format if skill else "text"
+                    result = SkillExecutor._parse_output(buffer, output_format)
+                    save_target = Planner.resolve_value(step.save_to, context)
+                    if save_target:
+                        SkillExecutor.update_memory_by_target(
+                            self.memory, save_target, result
+                        )
+                except Exception:
+                    # 保存失败不中断流程
+                    pass
+
         elif step.step_type == StepType.LOOP:
+
             items = Planner.resolve_value(f"{{{{{step.loop_items}}}}}", context)
             if not items:
                 yield f"\n[警告] 循环变量 {step.loop_items} 为空\n"
@@ -165,6 +186,9 @@ class WritingAgent:
             "outline": self.memory.outline,
             "sections": self.memory.sections,
             "references": self.memory.references,
+            "full_text": "\n\n".join(
+                s.get("content", "") for s in self.memory.sections
+            ),
             "summary": self.memory.get_summary()
         }
     

@@ -145,9 +145,11 @@ class SkillExecutor:
         """根据 Skill 输出配置更新记忆"""
         if not skill.output.auto_save or not skill.output.save_target:
             return
-        
-        target = skill.output.save_target
-        
+        cls.update_memory_by_target(memory, skill.output.save_target, result)
+
+    @classmethod
+    def update_memory_by_target(cls, memory: PaperMemory, target: str, result: Any):
+        """按保存目标更新记忆（供 Skill 与 Pipeline 共用）"""
         if target == "outline":
             memory.outline = result
         elif target == "abstract":
@@ -158,6 +160,18 @@ class SkillExecutor:
                 )
             else:
                 memory.update_section("abstract", "摘要", str(result))
+        elif target == "references":
+            # 存为 type=references 的章节
+            if isinstance(result, list):
+                content = json.dumps(result, ensure_ascii=False)
+            elif isinstance(result, dict):
+                content = json.dumps(
+                    result.get("references", result), ensure_ascii=False
+                )
+            else:
+                content = str(result)
+            memory.update_section("references", "参考文献", content)
+            memory.references = content
         elif target.startswith("sections."):
             section_title = target.replace("sections.", "")
             if isinstance(result, str):

@@ -1,0 +1,71 @@
+id: references
+name: 参考文献生成
+description: 根据论文主题和正文内容生成 GB/T 7714 格式的参考文献列表
+version: "1.0"
+category: writing
+
+input:
+  - name: topic
+    type: string
+    required: true
+    description: 论文题目
+  - name: full_text
+    type: string
+    required: false
+    default: ""
+    description: 论文正文内容（用于匹配文中引用）
+  - name: count
+    type: integer
+    required: false
+    default: 10
+    description: 参考文献数量
+
+context_vars:
+  - outline
+  - full_text
+
+prompt_template: |
+  你是一位学术论文写作专家。请为以下论文生成一份规范的参考文献列表。
+
+  论文题目：{{topic}}
+  参考文献数量：{{count}} 篇
+
+  {% if outline %}
+  论文大纲：
+  {{outline | tojson(indent=2)}}
+  {% endif %}
+
+  {% if full_text %}
+  正文片段（用于匹配文中引用标注 [1] [2] 等）：
+  {{full_text[:6000]}}
+  {% endif %}
+
+  要求：
+  1. 严格按照 GB/T 7714-2015 格式
+  2. 文献类型标注：[J]期刊 [M]专著 [D]学位论文 [C]会议 [EB/OL]网络资源
+  3. 期刊文献格式：作者. 题名[J]. 刊名, 年, 卷(期): 页码.
+  4. 专著格式：作者. 书名[M]. 出版地: 出版社, 年份.
+  5. 中文文献需保留中文，英文文献用英文格式
+  6. 文献应与论文主题高度相关，尽量真实可信
+  7. 按文中引用顺序编号
+
+  请输出 JSON 数组，每个元素包含 cite（[1]形式编号）、author、title、source、year 和 formatted（完整格式化条目）：
+  [
+    {
+      "cite": "[1]",
+      "author": "张三, 李四",
+      "title": "深度学习在图像识别中的应用",
+      "source": "计算机学报",
+      "year": "2021",
+      "formatted": "张三, 李四. 深度学习在图像识别中的应用[J]. 计算机学报, 2021, 44(3): 1-15."
+    }
+  ]
+
+output:
+  format: json
+  auto_save: true
+  save_target: references
+
+model_params:
+  temperature: 0.6
+  max_tokens: 2500
