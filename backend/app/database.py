@@ -201,6 +201,18 @@ class Database:
         if row and row.get("is_builtin"):
             raise ValueError(f"内置模板 {template_id} 不可删除")
         await self.execute("DELETE FROM templates WHERE id = ?", (template_id,))
+
+    async def update_template(self, template_id: str, name: str, config: dict):
+        """更新自定义模板（内置模板禁止修改）"""
+        row = await self.fetchone("SELECT is_builtin FROM templates WHERE id = ?", (template_id,))
+        if not row:
+            raise ValueError(f"模板 {template_id} 不存在")
+        if row.get("is_builtin"):
+            raise ValueError(f"内置模板 {template_id} 不可修改")
+        await self.execute(
+            "UPDATE templates SET name = ?, config = ? WHERE id = ?",
+            (name, json.dumps(config, ensure_ascii=False), template_id),
+        )
     
     # === 查重库操作 ===
     

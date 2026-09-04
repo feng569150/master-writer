@@ -106,6 +106,21 @@ class TemplateEngine:
         cls._templates.pop(template_id, None)
 
     @classmethod
+    async def update_custom(cls, template_id: str, name: str, config: dict) -> TemplateConfig:
+        """更新自定义模板（内置模板禁止修改）"""
+        if template_id not in cls._templates:
+            raise ValueError(f"模板 {template_id} 不存在")
+        try:
+            await db.update_template(template_id, name, config)
+        except ValueError as e:
+            raise e
+        # 确保内存模板的 id/name 与传入一致
+        merged = {**config, "id": template_id, "name": name}
+        template = TemplateConfig(**merged)
+        cls._templates[template_id] = template
+        return template
+
+    @classmethod
     async def list_raw(cls):
         """列出带内置标记的原始信息（用于前端管理）"""
         return await db.list_templates()

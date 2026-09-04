@@ -82,6 +82,34 @@ class TemplateEngineTest(unittest.TestCase):
         self.assertTrue(asyncio.run(_run()), "内置模板删除应抛异常")
         self.assertIsNotNone(TemplateEngine.get("default"), "内置模板应保留")
 
+    def test_update_custom_template(self):
+        """自定义模板可编辑更新"""
+        async def _run():
+            cfg = TemplateParser.get_default_template()
+            cfg["id"] = "edit_tpl_test"
+            await TemplateEngine.create_custom("edit_tpl_test", "原名", cfg)
+            # 修改名称字号
+            cfg2 = dict(cfg)
+            cfg2["fonts"] = {**cfg["fonts"], "size": 14}
+            updated = await TemplateEngine.update_custom("edit_tpl_test", "新名", cfg2)
+            return updated
+
+        t = asyncio.run(_run())
+        self.assertEqual(t.name, "新名")
+        self.assertEqual(t.fonts.size, 14, "字号应更新")
+
+    def test_cannot_update_builtin(self):
+        """内置模板不可编辑"""
+        async def _run():
+            try:
+                await TemplateEngine.update_custom("default", "改名", {})
+                return False
+            except ValueError:
+                return True
+
+        self.assertTrue(asyncio.run(_run()), "内置模板编辑应抛异常")
+        self.assertEqual(TemplateEngine.get("default").name, "默认模板", "内置模板名不应变化")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

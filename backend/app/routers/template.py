@@ -11,6 +11,7 @@ from backend.app.models.schema import ResponseBase, TemplateConfig
 from backend.app.services.template_engine import TemplateEngine
 from backend.app.services.template_parser import TemplateParser
 from backend.app.config import settings
+from backend.app.database import db
 
 router = APIRouter(prefix="/api/templates", tags=["模板"])
 
@@ -129,4 +130,47 @@ async def delete_template(template_id: str):
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": f"删除失败: {str(e)}"}
+        )
+
+
+@router.put("/{template_id}")
+async def update_template(template_id: str, req: dict):
+    """更新自定义模板配置（内置模板不可修改）"""
+    try:
+        name = str(req.get("name") or "").strip()
+        config = req.get("config") or {}
+        if not name:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "模板名称不能为空"}
+            )
+        if not config:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "模板配置不能为空"}
+            )
+        # 从数据库读取当前配置并合并（保证字段完整）
+        existing = await db.get_template(template_id)
+        if not existing:
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "message": f"模板 {template_id} 不存在"}
+            )
+        merged = existing["config"]
+        merged.update(config)
+        # 深合并核心子对象
+        for key in ("page", "fonts", "paragraph", "headings"):
+            if isinstance(config.get(key), dict) and isinstance(merged.get(key), dict):
+                merged[key] = {**merged[key], **config[key]}
+        template = await TemplateEngine.update_custom(template_id, name, merged)
+        return ResponseBase(data=template.model_dump(), message=f"模板 {name} 已更新")
+    except ValueError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": str(e)}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": f"更新失败: {str(e)}"}
         )

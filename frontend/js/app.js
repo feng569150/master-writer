@@ -309,9 +309,15 @@ const app = {
                         </div>
                         <div class="text-xs text-gray-500 mt-1">${this.escapeHtml(t.description || '')} <span class="text-gray-300">(${t.id})</span></div>
                     </div>
-                    <button onclick="app.deleteTemplate('${t.id}', '${this.escapeHtml(t.name)}')" class="btn btn-sm btn-icon" ${t.is_builtin ? 'disabled' : ''} style="background:${t.is_builtin ? 'transparent' : '#fee2e2'};color:${t.is_builtin ? '#d1d5db' : '#dc2626'}" title="${t.is_builtin ? '内置模板不可删除' : '删除'}">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <div class="flex gap-1">
+                        ${!t.is_builtin ? `
+                        <button onclick="app.showTemplateEdit('${t.id}')" class="btn btn-sm btn-icon" style="background:#dbeafe;color:#1d4ed8" title="编辑">
+                            <i class="fas fa-pen"></i>
+                        </button>` : ''}
+                        <button onclick="app.deleteTemplate('${t.id}', '${this.escapeHtml(t.name)}')" class="btn btn-sm btn-icon" ${t.is_builtin ? 'disabled' : ''} style="background:${t.is_builtin ? 'transparent' : '#fee2e2'};color:${t.is_builtin ? '#d1d5db' : '#dc2626'}" title="${t.is_builtin ? '内置模板不可删除' : '删除'}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             `).join('');
         } catch (e) {
@@ -332,6 +338,89 @@ const app = {
             }
         } catch (e) {
             this.showToast('删除失败: ' + e.message, 'error');
+        }
+    },
+
+    // === 模板编辑 ===
+    async showTemplateEdit(id) {
+        try {
+            const res = await this.api(`/api/templates/${id}`);
+            if (!res.success || !res.data) {
+                this.showToast('加载模板失败', 'error');
+                return;
+            }
+            const t = res.data;
+            this._editTemplate = t;
+            document.getElementById('edit-template-id').value = t.id;
+            document.getElementById('edit-name').value = t.name || '';
+            document.getElementById('edit-margin-top').value = t.page?.margin_top ?? 2.54;
+            document.getElementById('edit-margin-bottom').value = t.page?.margin_bottom ?? 2.54;
+            document.getElementById('edit-margin-left').value = t.page?.margin_left ?? 3.17;
+            document.getElementById('edit-margin-right').value = t.page?.margin_right ?? 3.17;
+            document.getElementById('edit-font-zh').value = t.fonts?.chinese || '宋体';
+            document.getElementById('edit-font-en').value = t.fonts?.english || 'Times New Roman';
+            document.getElementById('edit-font-size').value = t.fonts?.size ?? 12;
+            document.getElementById('edit-line-spacing').value = t.paragraph?.line_spacing ?? 1.5;
+            document.getElementById('edit-indent').value = t.paragraph?.first_line_indent ?? 0.74;
+            document.getElementById('edit-h1-font').value = t.headings?.['1']?.font || '黑体';
+            document.getElementById('edit-h1-size').value = t.headings?.['1']?.size ?? 16;
+            document.getElementById('edit-h2-font').value = t.headings?.['2']?.font || '黑体';
+            document.getElementById('edit-h2-size').value = t.headings?.['2']?.size ?? 14;
+            document.getElementById('edit-h3-font').value = t.headings?.['3']?.font || '黑体';
+            document.getElementById('edit-h3-size').value = t.headings?.['3']?.size ?? 12;
+            this.showModal('modal-edit-template');
+        } catch (e) {
+            this.showToast('加载失败: ' + e.message, 'error');
+        }
+    },
+
+    async saveTemplateEdit() {
+        const t = this._editTemplate;
+        if (!t) {
+            this.showToast('请先选择要编辑的模板', 'error');
+            return;
+        }
+        const num = (id, def) => parseFloat(document.getElementById(id).value) || def;
+        const str = (id, def) => document.getElementById(id).value.trim() || def;
+
+        const config = {
+            page: {
+                margin_top: num('edit-margin-top', 2.54),
+                margin_bottom: num('edit-margin-bottom', 2.54),
+                margin_left: num('edit-margin-left', 3.17),
+                margin_right: num('edit-margin-right', 3.17)
+            },
+            fonts: {
+                chinese: str('edit-font-zh', '宋体'),
+                english: str('edit-font-en', 'Times New Roman'),
+                size: parseInt(document.getElementById('edit-font-size').value) || 12
+            },
+            paragraph: {
+                line_spacing: num('edit-line-spacing', 1.5),
+                first_line_indent: num('edit-indent', 0.74)
+            },
+            headings: {
+                '1': { font: str('edit-h1-font', '黑体'), size: parseInt(document.getElementById('edit-h1-size').value) || 16 },
+                '2': { font: str('edit-h2-font', '黑体'), size: parseInt(document.getElementById('edit-h2-size').value) || 14 },
+                '3': { font: str('edit-h3-font', '黑体'), size: parseInt(document.getElementById('edit-h3-size').value) || 12 }
+            }
+        };
+
+        try {
+            const res = await this.api(`/api/templates/${t.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ name: str('edit-name', t.name || '模板'), config })
+            });
+            if (res.success) {
+                this.closeModal('modal-edit-template');
+                this.showToast('模板已更新');
+                await this.loadTemplates();
+                this.showTemplateManage();
+            } else {
+                this.showToast(res.message || '更新失败', 'error');
+            }
+        } catch (e) {
+            this.showToast('更新失败: ' + e.message, 'error');
         }
     },
 
