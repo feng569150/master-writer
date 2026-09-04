@@ -789,17 +789,27 @@ const app = {
 
     async streamExecute(url, body) {
         const resultEl = document.getElementById('generation-result');
-        resultEl.innerHTML = '<div class="flex items-center text-blue-600 gap-2"><div class="spinner"></div>正在生成...</div>';
+        this._genController = new AbortController();
+        let fullText = '';
+
+        resultEl.innerHTML = `
+            <div class="flex items-center text-blue-600 gap-3">
+                <div class="spinner"></div>
+                <span>正在生成...</span>
+                <button onclick="app.pauseGeneration()" class="btn btn-secondary btn-sm" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74">
+                    <i class="fas fa-pause"></i> 暂停
+                </button>
+            </div>`;
 
         try {
             const response = await fetch(`${API_BASE}${url}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
+                signal: this._genController.signal
             });
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let fullText = '';
             resultEl.innerHTML = '';
 
             while (true) {
@@ -822,11 +832,61 @@ const app = {
                     }
                 }
             }
+            this._genController = null;
             this.state.lastResult = fullText;
             this.showToast('生成完成');
             setTimeout(() => this.selectPaper(this.state.currentPaper.id), 500);
         } catch (e) {
-            resultEl.innerHTML = `<span style="color:var(--danger)">生成失败: ${e.message}</span>`;
+            this._genController = null;
+            if (e.name === 'AbortError') {
+                // 用户暂停：保存已生成的部分内容
+                this.state.lastResult = fullText;
+                if (fullText && fullText.trim()) {
+                    resultEl.innerHTML = this.escapeHtml(fullText) +
+                        '<div class="mt-3 text-green-600"><i class="fas fa-check-circle"></i> 已暂停，正在保存已生成内容...</div>';
+                    await this.savePausedContent(fullText);
+                } else {
+                    resultEl.innerHTML = '<span class="text-gray-500">已暂停（暂无内容可保存）</span>';
+                }
+            } else {
+                resultEl.innerHTML = `<span style="color:var(--danger)">生成失败: ${e.message}</span>`;
+            }
+        }
+    },
+
+    async pauseGeneration() {
+        if (this._genController) {
+            this._genController.abort();
+        }
+    },
+
+    async savePausedContent(text) {
+        const paper = this.state.currentPaper;
+        if (!paper) {
+            this.showToast('未找到论文', 'error');
+            return;
+        }
+        try {
+            const now = new Date();
+            const ts = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            const res = await this.api('/api/sections', {
+                method: 'POST',
+                body: JSON.stringify({
+                    paper_id: paper.id,
+                    type: 'body',
+                    title: 'AI 生成内容（暂停于 ' + ts + '）',
+                    content: text,
+                    order: (paper.sections || []).length
+                })
+            });
+            if (res.success) {
+                this.showToast('已保存，可导出 Word 查看（新增了一个章节）');
+                await this.selectPaper(paper.id);
+            } else {
+                this.showToast('保存失败: ' + (res.message || ''), 'error');
+            }
+        } catch (err) {
+            this.showToast('保存失败: ' + err.message, 'error');
         }
     },
 
