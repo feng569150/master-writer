@@ -80,6 +80,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def no_cache_static(request, call_next):
+    """静态资源禁用缓存，确保每次改版后浏览器立即获取最新 JS/CSS"""
+    response = await call_next(request)
+    if request.url.path.startswith("/static/") or request.url.path == "/":
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
 # 注册路由
 app.include_router(template.router)
 app.include_router(writing.router)
