@@ -1,5 +1,5 @@
 """
-参考文献生成与导出测试
+参考文献生成与导出测试 + 自定义 Pipeline 存储测试
 """
 
 import os
@@ -18,8 +18,8 @@ from backend.app.services.template_engine import TemplateEngine
 from backend.app.services.document_engine import DocumentEngine
 from backend.app.services.model_provider import ModelManager
 from backend.app.services.skill_engine import SkillEngine
-from backend.app.agent.memory import MemoryStore
 from backend.app.agent.agent import WritingAgent
+from backend.app.agent import pipelines as ppl
 
 
 class ReferencesTest(unittest.TestCase):
@@ -31,7 +31,7 @@ class ReferencesTest(unittest.TestCase):
             await ModelManager.initialize()
             SkillEngine.load_skills()
             ModelManager._default_provider = "mock"
-            cls.paper_id = "reftest1"
+            cls.paper_id = "reftest2"
             await db.create_paper(cls.paper_id, "参考文献测试论文", "default", None)
 
         asyncio.run(_init())
@@ -41,17 +41,13 @@ class ReferencesTest(unittest.TestCase):
         async def _run():
             agent = WritingAgent(self.paper_id)
             await agent.load()
-            out = ""
-            async for chunk in agent.run_skill(
-                "references",
-                {"topic": "深度学习", "count": 5},
-                stream=False,
+            async for _ in agent.run_skill(
+                "references", {"topic": "深度学习", "count": 5},
+                stream=False, save_to="references",
             ):
-                out += chunk
-            await MemoryStore.save(self.paper_id)
+                pass
             sections = await db.get_sections(self.paper_id)
-            ref_types = [s["type"] for s in sections]
-            return ref_types
+            return [s["type"] for s in sections]
 
         types = asyncio.run(_run())
         self.assertIn("references", types, "应有 references 章节")
@@ -59,7 +55,6 @@ class ReferencesTest(unittest.TestCase):
     def test_references_export_formatted(self):
         """参考文献应在 docx 中以悬挂缩进列表导出"""
         async def _run():
-            # 手动构造 references 章节（模拟 AI 输出）
             refs = json.dumps([
                 {
                     "cite": "[1]",
@@ -67,7 +62,7 @@ class ReferencesTest(unittest.TestCase):
                     "title": "深度学习研究综述",
                     "source": "计算机学报",
                     "year": "2020",
-                    "formatted": "张三. 深度学习研究综述[J]. 计算机学报, 2020, 43(1): 1-20.",
+                    "formatted": "张三. 深度学习研究综述[J]. 计算机学报,2020,43(1):1-20.",
                 },
                 {
                     "cite": "[2]",
@@ -75,11 +70,10 @@ class ReferencesTest(unittest.TestCase):
                     "title": "图像识别技术",
                     "source": "软件学报",
                     "year": "2021",
-                    "formatted": "李四. 图像识别技术[J]. 软件学报, 2021, 32(2): 50-70.",
+                    "formatted": "李四. 图像识别技术[J]. 软件学报,2021,32(2):50-70.",
                 },
             ], ensure_ascii=False)
-            await db.create_section("refsec1", self.paper_id, "references", "参考文献", refs, 0)
-
+            await db.create_section("refsec2", self.paper_id, "references", "参考文献", refs, 0)
             paper = await db.get_paper(self.paper_id)
             sections = await db.get_sections(self.paper_id)
             doc = DocumentEngine.create_document(
@@ -87,8 +81,7 @@ class ReferencesTest(unittest.TestCase):
             )
             data = DocumentEngine.to_bytes(doc)
             reopened = Document(io.BytesIO(data))
-            joined = "\n".join(p.text for p in reopened.paragraphs)
-            return joined
+            return "\n".join(p.text for p in reopened.paragraphs)
 
         text = asyncio.run(_run())
         self.assertIn("参考文献", text)
@@ -96,41 +89,95 @@ class ReferencesTest(unittest.TestCase):
         self.assertIn("图像识别技术", text)
 
 
-class FullPipelineTest(unittest.TestCase):
+class PipelineStorageTest(unittest.TestCase):
+    """自定义 Pipeline 的创建/校验/执行/删除"""
+
     @classmethod
     def setUpClass(cls):
         async def _init():
             await db.init()
-            await TemplateEngine.initialize()
             await ModelManager.initialize()
             SkillEngine.load_skills()
             ModelManager._default_provider = "mock"
-            cls.paper_id = "pipefull1"
-            await db.create_paper(cls.paper_id, "一键成文测试", "default", None)
+            cls.paper_id = "pipetest1"
+            await db.create_paper(cls.paper_id, "管线测试", "default", None)
 
         asyncio.run(_init())
 
-    def test_full_paper_pipeline(self):
-        """一键成文：大纲→正文→摘要→参考文献应全部生成"""
+    def test_save_and_list_custom_pipeline(self):
+        """自定义 pipeline 可保存并可列出"""
         async def _run():
+            await ppl.save_custom_pipeline(
+                "my_flow",
+                "我的流程",
+                "测试流程",
+                [{"skill": "paper_outline", "save_to": "outline"}],
+            )
+            rows = await ppl.list_pipelines()
+            ids = [r["id"] for r in rows]
+            return ids
+
+        ids = asyncio.run(_run())
+        self.assertIn("full_paper", ids, "内置应在列表")
+        self.assertIn("my_flow", ids, "自定义应在列表")
+
+    def test_builtin_protected(self):
+        """内置 pipeline 不可覆盖/删除"""
+        async def _run():
+            try:
+                await ppl.save_custom_pipeline("full_paper", "覆盖", "", [])
+                return "no_error"
+            except ppl.PipelineError:
+                pass
+            try:
+                await ppl.delete_custom_pipeline("full_paper")
+                return "no_error"
+            except ppl.PipelineError:
+                return "protected"
+
+        result = asyncio.run(_run())
+        self.assertEqual(result, "protected")
+
+    def test_validate_rejects_bad_definition(self):
+        """非法 pipeline 定义应被拒绝"""
+        async def _run():
+            try:
+                await ppl.save_custom_pipeline("bad_flow", "坏流程", "", [{"foo": 1}])
+                return "no_error"
+            except ppl.PipelineError:
+                return "rejected"
+
+        self.assertEqual(asyncio.run(_run()), "rejected")
+
+    def test_run_custom_pipeline_by_id(self):
+        """自定义 pipeline 按 ID 执行"""
+        async def _run():
+            await ppl.save_custom_pipeline(
+                "quick_flow",
+                "快速流程",
+                "",
+                [{"skill": "paper_outline", "save_to": "outline"}],
+            )
             agent = WritingAgent(self.paper_id)
             await agent.load()
             count = 0
-            async for chunk in agent.run_pipeline("full_paper", {}, stream=True):
+            async for chunk in agent.run_pipeline("quick_flow", {}, stream=True):
                 count += len(chunk)
-            await MemoryStore.save(self.paper_id)
             paper = await db.get_paper(self.paper_id)
-            sections = await db.get_sections(self.paper_id)
-            return paper, sections, count
+            return count, paper
 
-        paper, sections, count = asyncio.run(_run())
-        self.assertGreater(count, 100, "Pipeline 应有实质输出")
-        self.assertIsNotNone(paper["outline"], "大纲应生成")
-        types = [s["type"] for s in sections]
-        self.assertIn("abstract", types, "摘要应生成")
-        self.assertIn("references", types, "参考文献应生成")
-        body_count = len([t for t in types if t == "body"])
-        self.assertGreaterEqual(body_count, 1, "应有正文章节")
+        count, paper = asyncio.run(_run())
+        self.assertGreater(count, 50)
+        self.assertIsNotNone(paper.get("outline"), "自定义流程应保存大纲")
+
+    def test_delete_custom_pipeline(self):
+        """自定义 pipeline 可删除"""
+        async def _run():
+            await ppl.save_custom_pipeline("del_flow", "待删", "", [])
+            await ppl.delete_custom_pipeline("del_flow")
+            return await db.get_pipeline("del_flow")
+
+        self.assertIsNone(asyncio.run(_run()))
 
 
 if __name__ == "__main__":

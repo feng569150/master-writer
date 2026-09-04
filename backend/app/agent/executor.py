@@ -1,185 +1,163 @@
 """
-Agent 执行器
-执行单个 Skill，处理输入/输出/上下文
+Skill 执行器
+统一执行单个 Skill：注入上下文 → 渲染 Prompt → 流式生成 → 输出解析
 """
 
 import re
 import json
-from typing import Dict, Any, Optional, AsyncGenerator
-from jinja2 import Template
+from typing import Any, Dict, Optional, AsyncGenerator
 from backend.app.services.model_provider import ModelManager
 from backend.app.services.skill_engine import SkillEngine
-from backend.app.agent.memory import PaperMemory
 
 
-class SkillExecutor:
-    """Skill 执行器"""
-    
-    @classmethod
-    async def execute(
-        cls,
-        skill_id: str,
-        memory: PaperMemory,
-        inputs: Dict[str, Any] = None,
-        stream: bool = True
-    ) -> AsyncGenerator[str, None]:
-        """执行 Skill"""
-        skill = SkillEngine.get_skill(skill_id)
-        if not skill:
-            yield json.dumps({"error": f"Skill {skill_id} 不存在"}, ensure_ascii=False)
+# ==================== 状态工具 ====================
+
+def build_full_text(sections: list) -> str:
+    """拼接全文章节内容"""
+    return "\n\n".join(s.get("content", "") for s in (sections or []))
+
+
+def build_context(state: Dict[str, Any]) -> Dict[str, Any]:
+    """从论文状态构建 Skill 上下文"""
+    return {
+        "paper_id": state.get("paper_id"),
+        "title": state.get("title", ""),
+        "topic": state.get("title", ""),
+        "outline": state.get("outline"),
+        "sections": state.get("sections", []),
+        "references": state.get("references"),
+        "full_text": build_full_text(state.get("sections", [])),
+    }
+
+
+def update_section(state: Dict[str, Any], section_type: str, title: str, content: str):
+    """更新或添加章节：优先类型+标题匹配，其次标题匹配，最后追加"""
+    sections = state.setdefault("sections", [])
+    for s in sections:
+        if s.get("type") == section_type and s.get("title") == title:
+            s["content"] = content
             return
-        
-        inputs = inputs or {}
-        
-        # 构建变量上下文
-        context = cls._build_context(memory)
-        
-        # 注入 Skill 声明需要的上下文变量
-        for var_name in skill.context_vars:
-            if var_name in context and var_name not in inputs:
-                inputs[var_name] = context[var_name]
-        
-        # 渲染 Prompt
-        prompt = cls._render_prompt(skill.prompt_template, {**context, **inputs})
-        system_prompt = skill.system_prompt or "你是一位专业的学术写作助手。"
-        
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ]
-        
-        # 调用模型
-        full_response = ""
-        model_params = skill.model_params or {}
-        
-        async for chunk in ModelManager.generate_stream(messages=messages, **model_params):
-            full_response += chunk
-            if stream:
-                yield chunk
-        
-        # 解析输出
-        if not stream:
-            yield full_response
-        else:
-            # 在流结束后，保存最终解析结果到 memory
-            try:
-                result = cls._parse_output(full_response, skill.output.format)
-                cls._update_memory(memory, skill, result)
-            except Exception:
-                pass
-    
-    @classmethod
-    def execute_sync(
-        cls,
-        skill_id: str,
-        memory: PaperMemory,
-        inputs: Dict[str, Any] = None
-    ) -> str:
-        """同步执行 Skill（用于内部调用）"""
-        import asyncio
-        
-        async def _run():
-            result = ""
-            async for chunk in cls.execute(skill_id, memory, inputs, stream=False):
-                result += chunk
-            return result
-        
-        return asyncio.run(_run())
-    
-    @classmethod
-    def _build_context(cls, memory: PaperMemory) -> Dict[str, Any]:
-        """从记忆构建上下文"""
-        return {
-            "paper_id": memory.paper_id,
-            "title": memory.title,
-            "topic": memory.topic,
-            "outline": memory.outline,
-            "sections": memory.sections,
-            "references": memory.references,
-            "summary": memory.get_summary()
+    for s in sections:
+        if s.get("title") == title:
+            s["type"] = section_type
+            s["content"] = content
+            return
+    sections.append(
+        {
+            "type": section_type,
+            "title": title,
+            "content": content,
+            "order": len(sections),
         }
-    
-    @classmethod
-    def _render_prompt(cls, template_str: str, variables: Dict[str, Any]) -> str:
-        """渲染 Prompt"""
-        # 添加自定义过滤器
-        from jinja2 import Environment
-        env = Environment()
-        env.filters["tojson"] = lambda x, indent=2: json.dumps(x, ensure_ascii=False, indent=indent)
-        template = env.from_string(template_str)
-        return template.render(**variables)
-    
-    @classmethod
-    def _parse_output(cls, text: str, output_format: str) -> Any:
-        """解析输出"""
-        if output_format == "json":
-            return cls._extract_json(text)
-        return text
-    
-    @classmethod
-    def _extract_json(cls, text: str) -> Any:
-        """从文本中提取 JSON"""
+    )
+
+
+def save_output(state: Dict[str, Any], save_to: str, output_format: str, text: str) -> None:
+    """按保存目标把生成结果写入论文状态"""
+    # 解析输出（JSON 或纯文本）
+    result = _parse_output(text, output_format)
+
+    if save_to == "outline":
+        state["outline"] = result if isinstance(result, (dict, list)) else None
+    elif save_to == "abstract":
+        if isinstance(result, dict):
+            update_section(state, "abstract", "摘要", json.dumps(result, ensure_ascii=False))
+        else:
+            update_section(state, "abstract", "摘要", str(result))
+    elif save_to == "references":
+        if isinstance(result, list):
+            update_section(state, "references", "参考文献", json.dumps(result, ensure_ascii=False))
+        elif isinstance(result, dict):
+            refs = result.get("references", result)
+            update_section(state, "references", "参考文献", json.dumps(refs, ensure_ascii=False))
+        else:
+            update_section(state, "references", "参考文献", str(result))
+    elif save_to == "sections":
+        # 需要从输入中得知章节标题/类型，由调用方传入（正文/润色）
+        _save_as_section(state, result)
+    elif save_to and save_to.startswith("sections."):
+        title = save_to.replace("sections.", "")
+        update_section(state, "body", title, str(result))
+    # 其他 save_to 忽略
+
+
+def _save_as_section(state: Dict[str, Any], result: Any):
+    """sections 目标：结果可能是 dict（{title, content, type}）或字符串"""
+    if isinstance(result, dict) and result.get("title") and result.get("content"):
+        update_section(state, result.get("type", "body"), result["title"], result["content"])
+    elif isinstance(result, str) and result.strip():
+        # 无标题信息则覆盖最后一个 body 章节（润色场景由调用方直接处理）
+        sections = state.get("sections", [])
+        if sections:
+            sections[-1]["content"] = str(result)
+        else:
+            update_section(state, "body", "正文", str(result))
+
+
+# ==================== 输出解析 ====================
+
+def _parse_output(text: str, output_format: str) -> Any:
+    if output_format == "json":
+        return _extract_json(text)
+    return text
+
+
+def _extract_json(text: str) -> Any:
+    """从文本中提取 JSON（直接解析 / 代码块 / 大括号片段）"""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+    if m:
         try:
-            return json.loads(text)
+            return json.loads(m.group(1))
         except json.JSONDecodeError:
             pass
-        
-        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
-        if json_match:
-            try:
-                return json.loads(json_match.group(1))
-            except json.JSONDecodeError:
-                pass
-        
-        json_match = re.search(r'\{[\s\S]*\}', text)
-        if json_match:
-            try:
-                return json.loads(json_match.group(0))
-            except json.JSONDecodeError:
-                pass
-        
-        return text
-    
-    @classmethod
-    def _update_memory(cls, memory: PaperMemory, skill, result: Any):
-        """根据 Skill 输出配置更新记忆"""
-        if not skill.output.auto_save or not skill.output.save_target:
-            return
-        cls.update_memory_by_target(memory, skill.output.save_target, result)
+    m = re.search(r"\{[\s\S]*\}", text)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except json.JSONDecodeError:
+            pass
+    return text
 
-    @classmethod
-    def update_memory_by_target(cls, memory: PaperMemory, target: str, result: Any):
-        """按保存目标更新记忆（供 Skill 与 Pipeline 共用）"""
-        if target == "outline":
-            memory.outline = result
-        elif target == "abstract":
-            if isinstance(result, dict):
-                # 存为 type=abstract 的章节，方便导出读取
-                memory.update_section(
-                    "abstract", "摘要", json.dumps(result, ensure_ascii=False)
-                )
-            else:
-                memory.update_section("abstract", "摘要", str(result))
-        elif target == "references":
-            # 存为 type=references 的章节
-            if isinstance(result, list):
-                content = json.dumps(result, ensure_ascii=False)
-            elif isinstance(result, dict):
-                content = json.dumps(
-                    result.get("references", result), ensure_ascii=False
-                )
-            else:
-                content = str(result)
-            memory.update_section("references", "参考文献", content)
-            memory.references = content
-        elif target.startswith("sections."):
-            section_title = target.replace("sections.", "")
-            if isinstance(result, str):
-                # 推断 section 类型
-                section_type = "body"
-                if "引言" in section_title or "introduction" in section_title.lower():
-                    section_type = "introduction"
-                elif "结论" in section_title or "conclusion" in section_title.lower():
-                    section_type = "conclusion"
-                
-                memory.update_section(section_type, section_title, result)
+
+# ==================== 执行 ====================
+
+async def execute(
+    skill_id: str,
+    state: Dict[str, Any],
+    inputs: Optional[Dict[str, Any]] = None,
+    stream: bool = True,
+) -> AsyncGenerator[str, None]:
+    """执行 Skill 并流式返回生成内容"""
+    skill = SkillEngine.get_skill(skill_id)
+    if not skill:
+        yield json.dumps({"error": f"Skill {skill_id} 不存在"}, ensure_ascii=False)
+        return
+
+    inputs = dict(inputs or {})
+    context = build_context(state)
+
+    # 注入 Skill 声明需要的上下文变量（未显式提供时）
+    for var_name in skill.context_vars or []:
+        if var_name in context and var_name not in inputs:
+            inputs[var_name] = context[var_name]
+
+    # 渲染 Prompt
+    from jinja2 import Environment
+    env = Environment()
+    env.filters["tojson"] = lambda x, indent=2: json.dumps(x, ensure_ascii=False, indent=indent)
+    variables = {**context, **inputs}
+    prompt = env.from_string(skill.prompt_template).render(**variables)
+    system_prompt = skill.system_prompt or "你是一位专业的学术写作助手。"
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": prompt},
+    ]
+
+    model_params = skill.model_params or {}
+    async for chunk in ModelManager.generate_stream(messages=messages, **model_params):
+        yield chunk

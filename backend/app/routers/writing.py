@@ -4,6 +4,7 @@
 
 import uuid
 import json
+from pydantic import BaseModel
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse, JSONResponse
 from backend.app.models.schema import (
@@ -13,7 +14,7 @@ from backend.app.models.schema import (
 from backend.app.database import db
 from backend.app.services.skill_engine import SkillEngine
 from backend.app.agent.agent import WritingAgent, create_agent
-from backend.app.agent.memory import MemoryStore
+from backend.app.agent import pipelines as ppl
 
 router = APIRouter(prefix="/api", tags=["写作"])
 
@@ -143,14 +144,14 @@ async def execute_skill(skill_id: str, req: SkillExecuteRequest):
 
 @router.post("/skills/pipeline")
 async def run_pipeline(req: SkillPipelineRequest):
-    """执行 Skill Pipeline（新版 Agent Loop）"""
+    """执行 Skill Pipeline（兼容旧接口，按 skill 列表顺序执行）"""
+    def _build_custom_steps(skills: list) -> list:
+        return [{"skill": s} for s in skills]
+
     async def event_generator():
         agent = await create_agent(req.paper_id)
-        async for chunk in agent.run_pipeline(
-            pipeline_name=req.skills[0] if len(req.skills) == 1 else "custom",
-            inputs={"skills": req.skills} if len(req.skills) > 1 else {},
-            stream=True
-        ):
+        steps = _build_custom_steps(req.skills)
+        async for chunk in agent.run_pipeline({"steps": steps, "name": "自定义"}, {}, stream=True):
             yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
     
@@ -162,17 +163,69 @@ async def run_pipeline(req: SkillPipelineRequest):
 
 @router.post("/agent/pipeline/{pipeline_name}")
 async def run_agent_pipeline(pipeline_name: str, req: SkillExecuteRequest):
-    """运行 Agent Pipeline（full_paper / outline_only / polish_paper）"""
+    """运行 Pipeline（内置名或自定义 ID），支持流式"""
     async def event_generator():
-        agent = await create_agent(req.paper_id)
-        async for chunk in agent.run_pipeline(pipeline_name, req.inputs, stream=True):
-            yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
+        try:
+            agent = await create_agent(req.paper_id)
+            async for chunk in agent.run_pipeline(pipeline_name, req.inputs, stream=True):
+                yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'chunk': f'\n[错误] {e}\n'}, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
     
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream"
     )
+
+
+# === Pipeline 管理（为自定义编排 UI 提供接口） ===
+
+@router.get("/agent/pipelines")
+async def list_pipelines():
+    """列出所有 pipeline（内置 + 自定义）"""
+    return ResponseBase(data=await ppl.list_pipelines())
+
+
+class PipelineCreate(BaseModel):
+    id: str
+    name: str
+    description: str = ""
+    steps: list
+
+
+@router.post("/agent/pipelines")
+async def create_pipeline(req: PipelineCreate):
+    """创建自定义 pipeline"""
+    try:
+        data = await ppl.save_custom_pipeline(
+            req.id.strip(), req.name, req.description, req.steps
+        )
+        return ResponseBase(data=data, message=f"Pipeline {req.name} 已创建")
+    except ppl.PipelineError as e:
+        return JSONResponse(status_code=400, content={"success": False, "message": str(e)})
+
+
+@router.put("/agent/pipelines/{pipeline_id}")
+async def update_pipeline(pipeline_id: str, req: PipelineCreate):
+    """更新自定义 pipeline"""
+    try:
+        data = await ppl.save_custom_pipeline(
+            pipeline_id, req.name, req.description, req.steps
+        )
+        return ResponseBase(data=data, message=f"Pipeline {req.name} 已更新")
+    except ppl.PipelineError as e:
+        return JSONResponse(status_code=400, content={"success": False, "message": str(e)})
+
+
+@router.delete("/agent/pipelines/{pipeline_id}")
+async def delete_pipeline(pipeline_id: str):
+    """删除自定义 pipeline（内置不可删）"""
+    try:
+        await ppl.delete_custom_pipeline(pipeline_id)
+        return ResponseBase(message=f"Pipeline {pipeline_id} 已删除")
+    except ppl.PipelineError as e:
+        return JSONResponse(status_code=400, content={"success": False, "message": str(e)})
 
 
 # === 通用生成 ===

@@ -37,22 +37,35 @@ class TemplateEngine:
 - 文档生成采用"内容+样式分离"模式：先写入纯文本内容，再批量应用样式
 - 目录自动生成：通过 python-docx 的 TOC 字段
 
-### 2.2 Skill 引擎（SkillEngine）
+### 2.2 Skill 引擎与 Pipeline 编排
 
-职责：解析 Skill 定义，编排写作流程，调用 AI 生成内容。
+职责：解析 Skill 定义（YAML），按 Pipeline 编排执行，产出论文内容。
 
 ```python
-class SkillEngine:
-    def load_skill(skill_id: str) -> SkillDefinition
-    def execute(skill: SkillDefinition, context: PaperContext) -> SkillResult
-    def run_pipeline(pipeline: List[str], context: PaperContext) -> Generator
+class WritingAgent:
+    async def load():            # 论文状态 ← 数据库（title/outline/sections）
+    async def run_skill(...)     # 执行单个 Skill
+    async def run_pipeline(...)  # 按 steps 顺序执行（skill / loop）
+    async def save():            # 状态 → 数据库
+```
+
+**Pipeline 定义（数据驱动，内置或用户自定义）**：
+```json
+{"steps": [
+  {"skill": "paper_outline", "save_to": "outline"},
+  {"loop": {"over": "outline.sections", "as": "section",
+     "steps": [{"skill": "body_writing", "save_to": "sections"}]}},
+  {"skill": "abstract", "save_to": "abstract"}
+]}
 ```
 
 **关键设计**：
-- Skill 定义用 YAML，包含：输入参数、输出格式、Prompt 模板、模型参数
-- 支持变量插值：`{{topic}}`、`{{outline}}`
-- Pipeline 支持顺序执行和条件分支
-- 上下文对象 PaperContext 维护全局状态，确保前后文一致
+- 论文状态即"记忆"：每篇论文的 title/outline/sections 就是完整上下文，
+  每次执行从数据库读取、步骤间更新、结束写回，无需额外缓存层
+- 变量插值：`{{title}}`、`{{outline.sections}}`、`{{section.title}}`
+- 内置 3 个 pipeline（一键成文/仅大纲/全文润色），用户可自定义 pipeline 存数据库
+- 步骤类型只保留 skill 与 loop（按需取舍，不做 unused 的条件分支）
+- Skill 定义用 YAML：输入参数、输出格式、Prompt 模板、模型参数
 
 ### 2.3 模型提供者（ModelProvider）
 
@@ -74,8 +87,9 @@ class DeepSeekProvider(ModelProvider): ...
 
 **关键设计**：
 - 所有 Provider 返回统一格式的流式输出（SSE）
-- 配置热加载：修改配置无需重启服务
-- 失败降级：主模型失败可自动切换到备用模型
+- 支持任意 OpenAI 兼容端点（中转站/通义/Kimi 等自定义 base_url）
+- 流式 chunk 容错：空 choices / 用法统计块 / error 块不崩溃
+- 配置持久化到数据库，重启不丢
 
 ### 2.4 查重引擎（PlagiarismEngine）
 

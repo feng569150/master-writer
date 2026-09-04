@@ -66,6 +66,18 @@ class Database:
                 )
             """)
             
+            # 自定义 pipeline 表
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS pipelines (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    definition TEXT NOT NULL,
+                    is_builtin INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
             # 索引
             await db.execute("CREATE INDEX IF NOT EXISTS idx_sections_paper ON sections(paper_id)")
             
@@ -212,6 +224,29 @@ class Database:
     async def get_config(self, key: str, default: str = "") -> str:
         row = await self.fetchone("SELECT value FROM user_config WHERE key = ?", (key,))
         return row["value"] if row else default
+    
+    # === 自定义 Pipeline 操作 ===
+    
+    async def save_pipeline(self, pipeline_id: str, name: str, description: str, definition: dict):
+        await self.execute(
+            "INSERT OR REPLACE INTO pipelines (id, name, description, definition) VALUES (?, ?, ?, ?)",
+            (pipeline_id, name, description, json.dumps(definition, ensure_ascii=False))
+        )
+    
+    async def get_pipeline(self, pipeline_id: str) -> Optional[Dict[str, Any]]:
+        row = await self.fetchone("SELECT * FROM pipelines WHERE id = ?", (pipeline_id,))
+        if row:
+            row["definition"] = json.loads(row["definition"])
+        return row
+    
+    async def list_pipelines(self) -> List[Dict[str, Any]]:
+        rows = await self.fetchall("SELECT * FROM pipelines ORDER BY created_at DESC")
+        for row in rows:
+            row["definition"] = json.loads(row["definition"])
+        return rows
+    
+    async def delete_pipeline(self, pipeline_id: str):
+        await self.execute("DELETE FROM pipelines WHERE id = ?", (pipeline_id,))
 
 
 # 全局数据库实例

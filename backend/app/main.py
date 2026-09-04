@@ -21,7 +21,6 @@ from backend.app.database import db
 from backend.app.services.template_engine import TemplateEngine
 from backend.app.services.skill_engine import SkillEngine
 from backend.app.services.model_provider import ModelManager
-from backend.app.agent.memory import MemoryStore
 from backend.app.routers import template, writing, export, config
 
 
@@ -44,8 +43,7 @@ async def lifespan(app: FastAPI):
     print(f"[INIT] Loaded {len(SkillEngine.list_skills())} skills")
     
     # 初始化 Agent 记忆系统
-    await MemoryStore.load_all()
-    print("[INIT] Agent memory ready")
+    print("[INIT] Agent engine ready")
     
     # 初始化模型
     await ModelManager.initialize()
