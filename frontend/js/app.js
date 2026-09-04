@@ -688,6 +688,7 @@ const app = {
                         <div class="flex justify-between items-center mb-3">
                             <h3 class="font-semibold text-gray-700">AI 生成结果</h3>
                             <div class="flex gap-2">
+                                <div id="gen-controls" class="hidden"></div>
                                 <button onclick="app.copyResult()" class="btn btn-secondary btn-sm">复制</button>
                                 <button onclick="app.insertToSection()" class="btn btn-primary btn-sm">插入章节</button>
                             </div>
@@ -983,17 +984,16 @@ const app = {
 
     async streamExecute(url, body) {
         const resultEl = document.getElementById('generation-result');
+        const controls = document.getElementById('gen-controls');
         this._genController = new AbortController();
         let fullText = '';
 
-        resultEl.innerHTML = `
-            <div class="flex items-center text-blue-600 gap-3">
-                <div class="spinner"></div>
-                <span>正在生成...</span>
-                <button onclick="app.pauseGeneration()" class="btn btn-secondary btn-sm" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74">
-                    <i class="fas fa-pause"></i> 暂停
-                </button>
-            </div>`;
+        // 暂停按钮常驻右上角，生成全程可见
+        controls.innerHTML = `<button onclick="app.pauseGeneration()" class="btn btn-sm" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74">
+            <i class="fas fa-pause"></i> 暂停生成
+        </button>`;
+        controls.classList.remove('hidden');
+        resultEl.innerHTML = '<div class="flex items-center text-blue-600 gap-2"><div class="spinner"></div>正在生成...</div>';
 
         try {
             const response = await fetch(`${API_BASE}${url}`, {
@@ -1027,6 +1027,8 @@ const app = {
                 }
             }
             this._genController = null;
+            controls.classList.add('hidden');
+            controls.innerHTML = '';
             this.state.lastResult = fullText;
             this.showToast('生成完成');
             setTimeout(() => this.selectPaper(this.state.currentPaper.id), 500);
@@ -1035,6 +1037,8 @@ const app = {
             if (e.name === 'AbortError') {
                 // 用户暂停：保存已生成的部分内容
                 this.state.lastResult = fullText;
+                controls.classList.add('hidden');
+                controls.innerHTML = '';
                 if (fullText && fullText.trim()) {
                     resultEl.innerHTML = this.escapeHtml(fullText) +
                         '<div class="mt-3 text-green-600"><i class="fas fa-check-circle"></i> 已暂停，正在保存已生成内容...</div>';
@@ -1043,6 +1047,8 @@ const app = {
                     resultEl.innerHTML = '<span class="text-gray-500">已暂停（暂无内容可保存）</span>';
                 }
             } else {
+                controls.classList.add('hidden');
+                controls.innerHTML = '';
                 resultEl.innerHTML = `<span style="color:var(--danger)">生成失败: ${e.message}</span>`;
             }
         }
