@@ -50,12 +50,6 @@
                         <button onclick="app.switchTab('writing')" class="nav-btn" data-tab="writing">
                             <i class="fas fa-pen"></i> 写作
                         </button>
-                        <button onclick="app.switchTab('plagiarism')" class="nav-btn" data-tab="plagiarism">
-                            <i class="fas fa-search"></i> 论文查重
-                        </button>
-                        <button onclick="app.switchTab('library')" class="nav-btn" data-tab="library">
-                            <i class="fas fa-book"></i> 查重库
-                        </button>
                     </nav>
                 </div>
 
@@ -84,7 +78,7 @@
                                 <i class="fas fa-graduation-cap text-white text-3xl"></i>
                             </div>
                             <h2 class="text-2xl font-bold text-gray-900 mb-2">开始你的论文写作</h2>
-                            <p class="text-gray-500 mb-8 max-w-md mx-auto">结构化生成、自动排版、本地查重，让论文写作更高效</p>
+                            <p class="text-gray-500 mb-8 max-w-md mx-auto">结构化生成、自动排版、模板自定义，让论文写作更高效</p>
                             
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto mb-8">
                                 <div class="p-5 bg-blue-50 rounded-xl border border-blue-100">
@@ -103,10 +97,10 @@
                                 </div>
                                 <div class="p-5 bg-purple-50 rounded-xl border border-purple-100">
                                     <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                                        <i class="fas fa-shield-alt text-purple-600"></i>
+                                        <i class="fas fa-magic text-purple-600"></i>
                                     </div>
-                                    <h3 class="font-semibold text-gray-900">本地查重</h3>
-                                    <p class="text-sm text-gray-500 mt-1">零成本，可接第三方API</p>
+                                    <h3 class="font-semibold text-gray-900">一键成文</h3>
+                                    <p class="text-sm text-gray-500 mt-1">大纲到全文自动生成</p>
                                 </div>
                             </div>
                             
@@ -156,68 +150,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- 查重 -->
-                <div id="tab-plagiarism" class="tab-content hidden">
-                    <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">论文查重</h2>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-4">
-                                <label class="form-label">待查重文本</label>
-                                <textarea id="plagiarism-text" class="textarea" rows="10" placeholder="粘贴论文内容到这里..."></textarea>
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-                                <div>
-                                    <label class="form-label">相似度阈值</label>
-                                    <select id="plagiarism-threshold" class="select">
-                                        <option value="0.2">20% (严格)</option>
-                                        <option value="0.3" selected>30% (推荐)</option>
-                                        <option value="0.5">50% (宽松)</option>
-                                    </select>
-                                </div>
-                                <div class="md:col-span-2">
-                                    <label class="form-label">查重模式</label>
-                                    <div class="flex gap-2">
-                                        <button onclick="app.checkPlagiarism('local')" class="btn btn-purple flex-1">
-                                            <i class="fas fa-search"></i> 本地库查重
-                                        </button>
-                                        <button onclick="app.checkPlagiarism('external')" class="btn btn-secondary flex-1">
-                                            <i class="fas fa-external-link-alt"></i> 第三方查重
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div id="plagiarism-result" class="hidden">
-                                <!-- 查重结果 -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 论文库 -->
-                <div id="tab-library" class="tab-content hidden">
-                    <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">查重论文库</h2>
-                            <button onclick="app.showAddLibraryModal()" class="btn btn-success btn-sm">
-                                <i class="fas fa-plus"></i> 添加文档
-                            </button>
-                        </div>
-                        <div id="library-list" class="divide-y divide-gray-100">
-                            <div class="empty-state">
-                                <div class="empty-state-icon"><i class="fas fa-book"></i></div>
-                                <p>加载中...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- 新建论文弹窗 -->
     <div id="modal-new-paper" class="modal-overlay hidden">
@@ -361,30 +293,6 @@
         </div>
     </div>
 
-    <!-- 添加论文库弹窗 -->
-    <div id="modal-add-library" class="modal-overlay hidden">
-        <div class="modal">
-            <div class="modal-header">
-                <h3 class="modal-title">添加文档到查重库</h3>
-            </div>
-            <div class="modal-body">
-                <div class="mb-4">
-                    <label class="form-label">标题</label>
-                    <input type="text" id="library-title" class="input" placeholder="文档标题">
-                </div>
-                <div class="mb-4">
-                    <label class="form-label">内容</label>
-                    <textarea id="library-content" class="textarea" rows="6" placeholder="粘贴文档内容..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button onclick="app.closeModal('modal-add-library')" class="btn btn-secondary">取消</button>
-                <button onclick="app.confirmAddLibrary()" class="btn btn-success">添加</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 设置弹窗 -->
     <div id="modal-settings" class="modal-overlay hidden">
         <div class="modal modal-lg">
             <div class="modal-header">
@@ -426,17 +334,7 @@
                         </div>
                     </div>
                 </div>
-                
-                <div class="border-t border-gray-100 pt-4">
-                    <h4 class="text-sm font-semibold text-gray-900 mb-3">外部查重 API（可选）</h4>
-                    <p class="text-sm text-gray-500 mb-3">如需对标知网，可配置第三方查重服务（需自费）</p>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="form-label">PaperPass API Key</label>
-                            <input type="password" id="setting-paperpass-key" class="input" placeholder="可选">
-                        </div>
-                    </div>
-                </div>
+
             </div>
             <div class="modal-footer">
                 <button onclick="app.closeModal('modal-settings')" class="btn btn-secondary">取消</button>

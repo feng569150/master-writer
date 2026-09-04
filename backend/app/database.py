@@ -58,18 +58,6 @@ class Database:
                 )
             """)
             
-            # 查重库文档表
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS paper_library (
-                    id TEXT PRIMARY KEY,
-                    title TEXT,
-                    content TEXT,
-                    fingerprint TEXT,
-                    metadata TEXT,
-                    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
             # 用户配置表
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS user_config (
@@ -80,7 +68,6 @@ class Database:
             
             # 索引
             await db.execute("CREATE INDEX IF NOT EXISTS idx_sections_paper ON sections(paper_id)")
-            await db.execute("CREATE INDEX IF NOT EXISTS idx_paper_library_title ON paper_library(title)")
             
             await db.commit()
     
@@ -213,32 +200,6 @@ class Database:
             "UPDATE templates SET name = ?, config = ? WHERE id = ?",
             (name, json.dumps(config, ensure_ascii=False), template_id),
         )
-    
-    # === 查重库操作 ===
-    
-    async def add_to_library(self, doc_id: str, title: str, content: str, fingerprint: dict, metadata: dict = None):
-        await self.execute(
-            "INSERT INTO paper_library (id, title, content, fingerprint, metadata) VALUES (?, ?, ?, ?, ?)",
-            (doc_id, title, content, json.dumps(fingerprint, ensure_ascii=False), 
-             json.dumps(metadata or {}, ensure_ascii=False))
-        )
-    
-    async def get_library_docs(self) -> List[Dict[str, Any]]:
-        rows = await self.fetchall("SELECT id, title, metadata, added_at FROM paper_library ORDER BY added_at DESC")
-        for row in rows:
-            if row.get("metadata"):
-                row["metadata"] = json.loads(row["metadata"])
-        return rows
-    
-    async def get_library_doc(self, doc_id: str) -> Optional[Dict[str, Any]]:
-        row = await self.fetchone("SELECT * FROM paper_library WHERE id = ?", (doc_id,))
-        if row:
-            row["fingerprint"] = json.loads(row["fingerprint"]) if row.get("fingerprint") else {}
-            row["metadata"] = json.loads(row["metadata"]) if row.get("metadata") else {}
-        return row
-    
-    async def delete_library_doc(self, doc_id: str):
-        await self.execute("DELETE FROM paper_library WHERE id = ?", (doc_id,))
     
     # === 用户配置 ===
     

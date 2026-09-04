@@ -196,42 +196,6 @@ class ModelConfig(BaseModel):
     model: str
 
 
-# ==================== 查重 ====================
-
-class PlagiarismCheckRequest(BaseModel):
-    text: str
-    threshold: float = 0.3
-
-
-class PlagiarismMatch(BaseModel):
-    source_id: str
-    source_title: str
-    similarity: float
-    matched_text: str
-    source_text: str
-    start_pos: int
-    end_pos: int
-
-
-class PlagiarismResult(BaseModel):
-    overall_similarity: float
-    checked_length: int
-    matches: List[PlagiarismMatch]
-
-
-class LibraryDocAdd(BaseModel):
-    title: str
-    content: str
-    metadata: Optional[Dict[str, Any]] = None
-
-
-class LibraryDocResponse(BaseModel):
-    id: str
-    title: str
-    metadata: Optional[Dict[str, Any]] = None
-    added_at: str
-
-
 # ==================== 导出 ====================
 
 class ExportRequest(BaseModel):

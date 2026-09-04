@@ -29,4 +29,4 @@ e2e_test_output.docx
 .DS_Store
 
 # 环境变量
-.env
+.envpush_retry.py

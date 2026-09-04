@@ -102,9 +102,10 @@ def main():
         f.write(raw)
     print(f"[6/6] 导出 Word OK: {len(raw)} 字节 (e2e_test_output.docx)")
 
-    # 7. 查重测试（本地库）
-    r = api("POST", "/api/plagiarism/check", {"text": out2[:500], "threshold": 0.3})
-    print(f"[7/7] 查重接口 OK: 相似度={r['data']['overall_similarity']}, 匹配={len(r['data']['matches'])} 条")
+    # 7. 导出 markdown
+    raw = api("POST", "/api/export/markdown", {"paper_id": paper_id, "format": "markdown"}, raw=True)
+    assert len(raw) > 100
+    print(f"[7/7] 导出 Markdown OK: {len(raw)} 字节")
 
     print("\n" + "=" * 50)
     print("全部通过！端到端流程可用。")

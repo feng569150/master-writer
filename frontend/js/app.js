@@ -1,6 +1,6 @@
 /**
  * MasterWriter 前端应用 v2
- * 现代简洁 UI + Agent Pipeline + 模板上传 + 外部查重
+ * 现代简洁 UI + Agent Pipeline + 模板自定义
  */
 
 const API_BASE = '';
@@ -21,7 +21,6 @@ const app = {
         this.loadTemplates();
         this.loadPapers();
         this.loadSkills();
-        this.loadLibrary();
         this.checkHealth();
         this.setupUploadZone();
     },
@@ -171,7 +170,6 @@ const app = {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
         document.getElementById(`tab-${tab}`).classList.remove('hidden');
         if (tab === 'papers') this.loadPapers();
-        if (tab === 'library') this.loadLibrary();
         if (tab === 'writing') this.renderWritingWorkspace();
     },
 
@@ -1060,138 +1058,6 @@ const app = {
         }
     },
 
-    // === Plagiarism ===
-    async checkPlagiarism(mode) {
-        const text = document.getElementById('plagiarism-text').value.trim();
-        if (!text) {
-            this.showToast('请输入待查重文本', 'error');
-            return;
-        }
-
-        if (mode === 'external') {
-            this.showToast('第三方查重需要配置 API Key', 'info');
-            return;
-        }
-
-        const threshold = parseFloat(document.getElementById('plagiarism-threshold').value);
-        const resultEl = document.getElementById('plagiarism-result');
-        resultEl.classList.remove('hidden');
-        resultEl.innerHTML = '<div class="flex items-center text-purple-600 gap-2"><div class="spinner" style="border-color:rgba(139,92,246,0.3);border-top-color:var(--purple)"></div>正在查重...</div>';
-
-        try {
-            const res = await this.api('/api/plagiarism/check', {
-                method: 'POST',
-                body: JSON.stringify({ text, threshold })
-            });
-            if (res.success) {
-                this.renderPlagiarismResult(res.data);
-            } else {
-                resultEl.innerHTML = `<div style="color:var(--danger)">查重失败: ${res.message}</div>`;
-            }
-        } catch (e) {
-            resultEl.innerHTML = `<div style="color:var(--danger)">请求失败: ${e.message}</div>`;
-        }
-    },
-
-    renderPlagiarismResult(data) {
-        const resultEl = document.getElementById('plagiarism-result');
-        const pct = (data.overall_similarity * 100).toFixed(1);
-        const colorClass = data.overall_similarity > 0.3 ? 'similarity-high' : (data.overall_similarity > 0.1 ? 'similarity-medium' : 'similarity-low');
-
-        let matchesHtml = '';
-        if (data.matches && data.matches.length > 0) {
-            matchesHtml = data.matches.map(m => `
-                <div class="match-item">
-                    <div class="match-source">
-                        <span class="font-semibold text-red-700">${m.source_title}</span>
-                        <span class="text-red-600 font-medium">${(m.similarity * 100).toFixed(1)}%</span>
-                    </div>
-                    <div class="match-text">${this.escapeHtml(m.matched_text)}</div>
-                </div>
-            `).join('');
-        } else {
-            matchesHtml = `<div class="text-center py-6 text-green-600"><i class="fas fa-check-circle text-2xl mb-2 block"></i>未发现明显重复内容</div>`;
-        }
-
-        resultEl.innerHTML = `
-            <div class="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
-                <div>
-                    <div class="text-sm text-gray-500">总体相似度</div>
-                    <div class="similarity-score ${colorClass}">${pct}%</div>
-                </div>
-                <div class="text-right text-sm text-gray-500">
-                    <div>检查字数</div>
-                    <div class="font-medium text-gray-900">${data.checked_length} 字</div>
-                </div>
-            </div>
-            <div>${matchesHtml}</div>
-        `;
-    },
-
-    // === Library ===
-    async loadLibrary() {
-        const res = await this.api('/api/plagiarism/library');
-        this.state.library = res.data || [];
-        this.renderLibraryList();
-    },
-
-    renderLibraryList() {
-        const container = document.getElementById('library-list');
-        if (!this.state.library.length) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon"><i class="fas fa-book"></i></div>
-                    <p>暂无文档，点击右上角添加</p>
-                </div>
-            `;
-            return;
-        }
-        container.innerHTML = this.state.library.map(doc => `
-            <div class="list-item">
-                <div>
-                    <div class="list-item-title">${doc.title || '未命名'}</div>
-                    <div class="list-item-meta">${new Date(doc.added_at).toLocaleDateString()}</div>
-                </div>
-                <button onclick="app.deleteLibraryDoc('${doc.id}')" class="btn btn-sm btn-icon" style="background:#fee2e2;color:#dc2626">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        `).join('');
-    },
-
-    showAddLibraryModal() {
-        document.getElementById('library-title').value = '';
-        document.getElementById('library-content').value = '';
-        this.showModal('modal-add-library');
-    },
-
-    async confirmAddLibrary() {
-        const title = document.getElementById('library-title').value.trim();
-        const content = document.getElementById('library-content').value.trim();
-        if (!title || !content) {
-            this.showToast('请填写标题和内容', 'error');
-            return;
-        }
-        const res = await this.api('/api/plagiarism/library', {
-            method: 'POST',
-            body: JSON.stringify({ title, content })
-        });
-        if (res.success) {
-            this.closeModal('modal-add-library');
-            this.showToast('添加成功');
-            this.loadLibrary();
-        } else {
-            this.showToast(res.message || '添加失败', 'error');
-        }
-    },
-
-    async deleteLibraryDoc(id) {
-        if (!confirm('确定删除此文档？')) return;
-        await this.api(`/api/plagiarism/library/${id}`, { method: 'DELETE' });
-        this.showToast('已删除');
-        this.loadLibrary();
-    },
-
     // === Export ===
     async exportPaper(format) {
         if (!this.state.currentPaper) {
@@ -1307,7 +1173,7 @@ const app = {
         }[provider] || 'gpt-4o-mini';
     },
     showHelp() {
-        alert(`MasterWriter 使用帮助：\n\n1. 配置 AI 模型（设置中填写 API Key）\n2. 新建论文或上传 Word 模板\n3. 使用"生成大纲"规划论文结构\n4. 分步生成各章节内容\n5. 使用"一键成文"自动完成全文\n6. 查重：本地库免费查重，或配置第三方 API\n7. 导出 Word / Markdown`);
+        alert(`MasterWriter 使用帮助：\n\n1. 配置 AI 模型（设置中填写 API Key）\n2. 新建论文 / 上传模板 / 手动定义模板\n3. 使用"生成大纲"规划论文结构\n4. 分步生成各章节内容\n5. 使用"一键成文"自动完成全文\n6. 导出 Word / Markdown`);
     }
 };
 

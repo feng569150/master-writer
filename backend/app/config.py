@@ -12,13 +12,11 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 # 允许通过环境变量覆盖数据目录（测试隔离用）
 DATA_DIR = Path(os.environ.get("MW_DATA_DIR", str(PROJECT_ROOT / "data")))
 DB_PATH = DATA_DIR / "db.sqlite"
-PAPER_LIBRARY_DIR = DATA_DIR / "paper_library"
 SKILLS_DIR = Path(__file__).parent.parent / "skills"
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 
-# 确保目录存在
+# 确保数据目录存在
 DATA_DIR.mkdir(exist_ok=True)
-PAPER_LIBRARY_DIR.mkdir(exist_ok=True)
 
 
 class Settings(BaseSettings):
@@ -51,11 +49,6 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen2.5"
     
-    # 查重配置
-    PLAGIARISM_THRESHOLD: float = 0.3  # 默认相似度阈值
-    PLAGIARISM_CHUNK_SIZE: int = 50    # 指纹分块大小（字符数）
-    
-    # 导出配置
     EXPORT_TEMP_DIR: str = str(DATA_DIR / "temp")
     
     class Config:

@@ -19,11 +19,10 @@ from contextlib import asynccontextmanager
 from backend.app.config import settings
 from backend.app.database import db
 from backend.app.services.template_engine import TemplateEngine
-from backend.app.services.plagiarism_engine import plagiarism_engine
 from backend.app.services.skill_engine import SkillEngine
 from backend.app.services.model_provider import ModelManager
 from backend.app.agent.memory import MemoryStore
-from backend.app.routers import template, writing, plagiarism, export, config
+from backend.app.routers import template, writing, export, config
 
 
 @asynccontextmanager
@@ -43,10 +42,6 @@ async def lifespan(app: FastAPI):
     # 加载 Skill
     SkillEngine.load_skills()
     print(f"[INIT] Loaded {len(SkillEngine.list_skills())} skills")
-    
-    # 初始化查重引擎
-    await plagiarism_engine.initialize()
-    print("[INIT] Plagiarism engine ready")
     
     # 初始化 Agent 记忆系统
     await MemoryStore.load_all()
@@ -92,7 +87,6 @@ async def no_cache_static(request, call_next):
 # 注册路由
 app.include_router(template.router)
 app.include_router(writing.router)
-app.include_router(plagiarism.router)
 app.include_router(export.router)
 app.include_router(config.router)
 
