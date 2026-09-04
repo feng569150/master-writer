@@ -110,8 +110,7 @@ class DocumentEngine:
 
         # ===== 目录 =====
         if template.supports_toc:
-            DocumentEngine._add_heading(doc, "目  录", template, "1")
-            DocumentEngine._add_toc_field(doc)
+            DocumentEngine._generate_toc(doc, sections, template)
             doc.add_page_break()
 
         # ===== 正文 =====
@@ -145,6 +144,79 @@ class DocumentEngine:
         outlineLvl = docx.oxml.OxmlElement("w:outlineLvl")
         outlineLvl.set(qn("w:val"), str(int(level) - 1))
         pPr.append(outlineLvl)
+
+    @staticmethod
+    def _collect_headings(sections) -> List[tuple]:
+        """从章节中收集所有 (level, title) 标题，用于目录"""
+        headings = []
+        import re as _re
+        for sec in sections:
+            if isinstance(sec, dict):
+                sec_type = sec.get("type")
+                sec_title = sec.get("title") or ""
+                content = sec.get("content") or ""
+            else:
+                sec_type = getattr(sec, "type", "")
+                sec_title = getattr(sec, "title", "") or ""
+                content = getattr(sec, "content", "") or ""
+            if sec_type in ("abstract", "references", None):
+                continue
+            # 章节标题作为一级
+            if sec_title.strip():
+                headings.append((1, _re.sub(r"[#*\s]+", " ", sec_title).strip()))
+            # 内容中的 Markdown 标题
+            for line in content.split("\n"):
+                m = _re.match(r"^(#{1,6})\s+(.+)$", line.strip())
+                if m:
+                    level = len(m.group(1))
+                    if level > 3:
+                        level = 3
+                    title = _re.sub(r"[*_`]+", "", m.group(2)).strip()
+                    if title:
+                        headings.append((level, title))
+        return headings
+
+    @staticmethod
+    def _generate_toc(doc: Document, sections, template: TemplateConfig):
+        """生成目录：预填标题列表 + TOC 域（Word 打开时自动更新页码）"""
+        DocumentEngine._add_heading(doc, "目  录", template, "1")
+
+        headings = DocumentEngine._collect_headings(sections)
+        if headings:
+            indent_map = {1: 0.0, 2: 0.74, 3: 1.48}
+            for level, title in headings:
+                p = doc.add_paragraph()
+                run = p.add_run(title)
+                run.font.name = template.fonts.english
+                run.font.size = Pt(max(template.fonts.size - 1, 10))
+                run.element.rPr.rFonts.set(qn("w:eastAsia"), template.fonts.chinese)
+                pf = p.paragraph_format
+                pf.first_line_indent = Cm(0)
+                pf.left_indent = Cm(indent_map.get(level, 1.48))
+                pf.space_before = Pt(0)
+                pf.space_after = Pt(2)
+                pf.line_spacing = 1.3
+                # 设置大纲级别方便 Word 识别
+                pPr = p._p.get_or_add_pPr()
+                outlineLvl = docx.oxml.OxmlElement("w:outlineLvl")
+                outlineLvl.set(qn("w:val"), str(level - 1))
+                pPr.append(outlineLvl)
+
+        # TOC 域：Word 打开后自动更新为带页码的目录
+        DocumentEngine._add_toc_field(doc)
+        DocumentEngine._enable_update_fields(doc)
+
+    @staticmethod
+    def _enable_update_fields(doc: Document):
+        """设置 Word 打开文档时自动更新域（目录页码）"""
+        try:
+            settings_el = doc.settings.element
+            if settings_el.find(qn("w:updateFields")) is None:
+                update_fields = docx.oxml.OxmlElement("w:updateFields")
+                update_fields.set(qn("w:val"), "true")
+                settings_el.append(update_fields)
+        except Exception:
+            pass
 
     @staticmethod
     def _add_toc_field(doc: Document):
@@ -256,11 +328,13 @@ class DocumentEngine:
             if not line:
                 continue
 
-            # Markdown 标题检测
-            h_match = re.match(r"^(#{1,3})\s+(.+)$", line)
+            # Markdown 标题检测（支持 1-6 级，超过 3 级折叠为 3 级样式）
+            h_match = re.match(r"^(#{1,6})\s+(.+)$", line)
             if h_match:
                 level = len(h_match.group(1))
-                title_text = re.sub(r"\*\*|\*|#", "", h_match.group(2)).strip()
+                if level > 3:
+                    level = 3
+                title_text = re.sub(r"\*\*|\*|#|`", "", h_match.group(2)).strip()
                 DocumentEngine._add_heading(doc, title_text, template, str(level))
                 continue
 
@@ -299,25 +373,59 @@ class DocumentEngine:
         # 参考文献标题
         DocumentEngine._add_heading(doc, "参考文献", template, "1")
 
-        for ref in refs:
+        for i, ref in enumerate(refs, start=1):
             formatted = ""
+            cite = f"[{i}]"
             if isinstance(ref, dict):
                 formatted = ref.get("formatted", "") or ""
+                if ref.get("cite"):
+                    cite = str(ref["cite"])
                 if not formatted:
-                    formatted = f"{ref.get('cite', '')} {ref.get('author', '')} {ref.get('title', '')} {ref.get('source', '')} {ref.get('year', '')}".strip()
+                    parts = [
+                        ref.get("author", ""),
+                        ref.get("title", ""),
+                        ref.get("source", ""),
+                        ref.get("year", ""),
+                    ]
+                    formatted = " ".join(p for p in parts if p)
             else:
                 formatted = str(ref)
 
+            formatted = DocumentEngine.normalize_reference(formatted)
             if not formatted:
                 continue
 
-            p = doc.add_paragraph(formatted)
+            p = doc.add_paragraph()
+            run = p.add_run(f"{cite} {formatted}" if not formatted.startswith("[") else formatted)
             DocumentEngine._apply_paragraph_style(p, template)
             # 悬挂缩进：首行缩进 0，左缩进 0.74cm
             pf = p.paragraph_format
             pf.first_line_indent = Cm(0)
             pf.left_indent = Cm(0.74)
             pf.line_spacing = 1.25
+
+    @staticmethod
+    def normalize_reference(text: str) -> str:
+        """参考文献条目规范化清洗（GB/T 7714 风格）"""
+        if not text:
+            return ""
+        # 1. 基础清洁
+        t = text.strip()
+        t = t.replace("\u3000", " ")  # 全角空格
+        t = re.sub(r"[ \t]+", " ", t)  # 合并连续空白
+        # 2. 去掉行首编号（如 [1]、1.、1、）
+        t = re.sub(r"^\s*(\[\d+\]|\d+[.、]|\d+)\s*", "", t)
+        # 3. 文献类型识别，确保带 [X] 标注（退化：默认 [J]，按引文编号动态判定）
+        if not re.search(r"\[[A-Z]", t):
+            t += " [J]"
+        # 4. 结尾标点规范：去除尾部杂散标点，保留一个英文句点
+        t = re.sub(r"[。．；;，,]+$", "", t).rstrip()
+        if not t.endswith("."):
+            t += "."
+        # 5. 年份与页码间的空格清理（", 2020, 43(1): 1-20." 规范）
+        t = re.sub(r",(\d{2,4})", r", \1", t)  # 数字前逗号补空格
+        t = re.sub(r"\s*:\s*", ": ", t)
+        return t
 
     @staticmethod
     def to_bytes(doc: Document) -> bytes:

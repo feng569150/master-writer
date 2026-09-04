@@ -71,6 +71,52 @@ class DocumentEngineTest(unittest.TestCase):
         self.assertIn("二级标题", joined)
         self.assertIn("正文内容", joined)
 
+    def test_deep_markdown_heading_no_hash(self):
+        """4 级及以下标题（####）不应残留 # 符号"""
+        sections = [
+            {"type": "body", "title": "", "content": "#### 5.2.1 边界问题\n这不是标题的正文。", "order": 0}
+        ]
+        doc = DocumentEngine.create_document(sections=sections, template_id="default")
+        text = "\n".join(p.text for p in doc.paragraphs)
+        self.assertNotIn("####", text, "不应残留 Markdown 井号")
+        self.assertIn("5.2.1 边界问题", text, "标题文字应被保留")
+        self.assertIn("这不是标题的正文", text)
+
+    def test_toc_prefilled(self):
+        """目录应预填章节标题，而非只有占位文本"""
+        sections = [
+            {"type": "body", "title": "第一章 绪论", "content": "## 1.1 研究背景\n内容。", "order": 0},
+            {"type": "body", "title": "第二章 方法", "content": "正文。", "order": 1},
+        ]
+        doc = DocumentEngine.create_document(
+            sections=sections, template_id="default", title="目录测试"
+        )
+        joined = "\n".join(p.text for p in doc.paragraphs)
+        self.assertIn("第一章 绪论", joined, "目录应包含一级标题")
+        self.assertIn("1.1 研究背景", joined, "目录应包含二级标题")
+        self.assertIn("第二章 方法", joined)
+
+    def test_normalize_reference(self):
+        """参考文献条目应被规范化清洗"""
+        raw = "张三, 李四. 深度学习综述   [J]. 计算机学报,2020,43(1):1-20"
+        out = DocumentEngine.normalize_reference(raw)
+        self.assertTrue(out.endswith("."), "应补结尾句点")
+        self.assertNotIn("  ", out, "不应有多余连续空格")
+        self.assertIn("[J]", out, "应保留文献类型")
+        self.assertIn("计算机学报, 2020, 43(1): 1-20.", out, "年份/页码空格应规范")
+
+        # 无文献类型时应补 [J]
+        raw2 = "王五. 无类型标注的条目"
+        out2 = DocumentEngine.normalize_reference(raw2)
+        self.assertIn("[J]", out2, "应补文献类型")
+        self.assertTrue(out2.endswith("."))
+
+        # 行首编号应被剥离（导出时统一重新编号）
+        raw3 = "[3] 赵六. 另一篇文献[M]. 北京: 某出版社, 2021"
+        out3 = DocumentEngine.normalize_reference(raw3)
+        self.assertFalse(out3.startswith("[3]"), "行首编号应剥离")
+        self.assertIn("[M]", out3)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
