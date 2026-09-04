@@ -4,6 +4,8 @@
 """
 
 import json
+import math
+import re
 from typing import Any, Dict, List, Optional, AsyncGenerator
 from backend.app.database import db
 from backend.app.agent import executor
@@ -40,6 +42,7 @@ class WritingAgent:
             "paper_id": self.paper_id,
             "title": paper.get("title", ""),
             "template_id": paper.get("template_id", "default"),
+            "target_words": paper.get("target_words", 8000) or 8000,
             "outline": paper.get("outline"),
             "sections": [
                 {
@@ -157,6 +160,11 @@ class WritingAgent:
         """顺序执行步骤列表（支持 skill 与 loop）"""
         total = len(steps)
         for i, step in enumerate(steps):
+            # 每一步前刷新上下文：前序步骤可能已更新 state（如大纲）
+            for key in ("outline", "sections", "title", "target_words", "template_id"):
+                context[key] = self.state.get(key)
+            context["full_text"] = executor.build_full_text(self.state.get("sections", []))
+
             # 进度
             kind = "skill" if "skill" in step else "loop"
             label = step.get("skill", "循环")
@@ -182,7 +190,7 @@ class WritingAgent:
         context: Dict[str, Any],
         stream: bool = True,
     ) -> AsyncGenerator[str, None]:
-        """执行单个步骤（skill 或 loop）"""
+        """执行单个步骤（skill 或 loop）；skill 支持分段续写 repeat"""
         if "skill" in step:
             skill_id = step["skill"]
             skill = SkillEngine.get_skill(skill_id)
@@ -191,22 +199,50 @@ class WritingAgent:
             resolved_inputs = {
                 k: resolve_value(v, context) for k, v in (step.get("inputs") or {}).items()
             }
-            # sections 类型步骤的特殊输入：当前章节标题（loop 内由调用注入）
+
+            # 参考文献：自动统计正文引文编号，保证编号一致
+            if skill_id == "references" and not resolved_inputs.get("count"):
+                n = executor.extract_citations(self.state.get("sections", []))
+                resolved_inputs["count"] = n if n > 0 else 5
+
             save_to = step.get("save_to")
 
-            buffer = ""
-            async for chunk in executor.execute(skill_id, self.state, resolved_inputs, stream):
-                buffer += chunk
-                yield chunk
+            # 分段续写：repeat 为目标字数 → ceil(words/800) 段
+            segments = 1
+            if step.get("repeat"):
+                try:
+                    n = int(resolve_value(step["repeat"], context) or 0)
+                    segments = max(1, math.ceil(n / 800))
+                except (TypeError, ValueError):
+                    segments = 1
 
-            if save_to and buffer:
-                if save_to == "sections" and resolved_inputs.get("section_title"):
-                    # 正文/润色：明确章节标题时直接落章节
-                    title = resolved_inputs["section_title"]
-                    sec_type = _infer_section_type(title)
-                    executor.update_section(self.state, sec_type, title, buffer)
-                else:
-                    executor.save_output(self.state, save_to, output_format, buffer)
+            title = resolved_inputs.get("section_title")
+            sec_type = _infer_section_type(title) if title else "body"
+
+            for seg in range(segments):
+                seg_inputs = dict(resolved_inputs)
+                if seg > 0 and title:
+                    # 传入本章已有内容，提示 AI 承接续写
+                    current = next(
+                        (s.get("content", "") for s in self.state.get("sections", [])
+                         if s.get("title") == title), "")
+                    if current:
+                        seg_inputs["last_content"] = current
+
+                buffer = ""
+                async for chunk in executor.execute(skill_id, self.state, seg_inputs, stream):
+                    buffer += chunk
+                    yield chunk
+
+                if save_to and buffer:
+                    if save_to == "sections" and title:
+                        # 首段覆盖、后续追加（分段续写累计）
+                        if seg == 0:
+                            executor.update_section(self.state, sec_type, title, buffer)
+                        else:
+                            executor.append_section(self.state, title, buffer)
+                    elif seg == 0:
+                        executor.save_output(self.state, save_to, output_format, buffer)
 
         elif "loop" in step:
             loop = step["loop"]

@@ -18,6 +18,11 @@ input:
     required: false
     default: 2000
     description: 目标字数
+  - name: last_content
+    type: string
+    required: false
+    default: ""
+    description: 本章已生成内容（分段续写时传入，用于承接上下文）
 
 context_vars:
   - outline
@@ -38,6 +43,11 @@ prompt_template: |
   {% if section_outline %}
   本章节大纲结构：
   {{section_outline | tojson(indent=2)}}
+  {% endif %}
+  
+  {% if last_content %}
+  本章已写好的内容（请严格承接下文继续撰写剩余部分，不要重复或改写已有内容）：
+  {{last_content[:1000]}}
   {% endif %}
   
   写作要求：

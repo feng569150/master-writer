@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api", tags=["写作"])
 async def create_paper(req: PaperCreate):
     """创建论文项目"""
     paper_id = str(uuid.uuid4())[:8]
-    await db.create_paper(paper_id, req.title, req.template_id)
+    await db.create_paper(paper_id, req.title, req.template_id, target_words=req.target_words)
     return ResponseBase(data={"id": paper_id, "title": req.title})
 
 

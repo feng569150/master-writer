@@ -88,12 +88,14 @@ OutlineNode.model_rebuild()
 class PaperCreate(BaseModel):
     title: str
     template_id: str
+    target_words: int = 8000
 
 
 class PaperUpdate(BaseModel):
     title: Optional[str] = None
     outline: Optional[dict] = None
     content: Optional[str] = None
+    target_words: Optional[int] = None
 
 
 class PaperResponse(BaseModel):

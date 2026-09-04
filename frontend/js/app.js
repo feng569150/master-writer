@@ -508,13 +508,14 @@ const app = {
     async confirmCreatePaper() {
         const title = document.getElementById('new-paper-title').value.trim();
         const templateId = document.getElementById('new-paper-template').value;
+        const targetWords = parseInt(document.getElementById('new-paper-words').value) || 8000;
         if (!title) {
             this.showToast('请输入论文题目', 'error');
             return;
         }
         const res = await this.api('/api/papers', {
             method: 'POST',
-            body: JSON.stringify({ title, template_id: templateId })
+            body: JSON.stringify({ title, template_id: templateId, target_words: targetWords })
         });
         if (res.success) {
             this.closeModal('modal-new-paper');
@@ -576,6 +577,7 @@ const app = {
                                 <div class="mt-2 flex flex-wrap gap-2">
                                     <span class="tag">${templateName}</span>
                                     <span class="tag">${paper.sections?.length || 0} 个章节</span>
+                                    <span class="tag" style="background:#fef3c7;color:#92400e" title="点击修改目标字数">目标 ${paper.target_words || 8000} 字 <i class="fas fa-pen text-xs ml-1" onclick="event.stopPropagation(); app.editTargetWords()"></i></span>
                                 </div>
                             </div>
                             <div class="flex gap-2">
@@ -935,14 +937,37 @@ const app = {
         });
     },
 
+    async editTargetWords() {
+        const paper = this.state.currentPaper;
+        const val = prompt('目标字数（课程论文按需填写，如 3000/5000/8000）：', paper.target_words || 8000);
+        const n = parseInt(val);
+        if (!n || n < 500) {
+            this.showToast('请输入不小于 500 的字数', 'error');
+            return;
+        }
+        const res = await this.api(`/api/papers/${paper.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ target_words: n })
+        });
+        if (res.success) {
+            this.showToast(`目标字数已改为 ${n} 字`);
+            await this.selectPaper(paper.id);
+        } else {
+            this.showToast('修改失败', 'error');
+        }
+    },
+
     async runPipeline(pipelineName) {
         if (!this.state.currentPaper) {
             this.showToast('请先选择一篇论文', 'error');
             return;
         }
+        const inputs = pipelineName === 'full_paper'
+            ? { word_count: this.state.currentPaper.target_words || 8000 }
+            : {};
         await this.streamExecute(`/api/agent/pipeline/${pipelineName}`, {
             paper_id: this.state.currentPaper.id,
-            inputs: {},
+            inputs,
             stream: true
         });
     },

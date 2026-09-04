@@ -20,22 +20,29 @@ class Database:
     
     async def init(self):
         """初始化数据库表结构"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path) as conn:
             # 论文表
-            await db.execute("""
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS papers (
                     id TEXT PRIMARY KEY,
                     title TEXT NOT NULL,
                     template_id TEXT NOT NULL,
                     outline TEXT,
                     content TEXT,
+                    target_words INTEGER DEFAULT 8000,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             
+            # 兼容旧库：papers 补充 target_words 列
+            async with conn.execute("PRAGMA table_info(papers)") as cur:
+                cols = await cur.fetchall()
+            if cols and "target_words" not in [c[1] for c in cols]:
+                await conn.execute("ALTER TABLE papers ADD COLUMN target_words INTEGER DEFAULT 8000")
+            
             # 论文章节表
-            await db.execute("""
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS sections (
                     id TEXT PRIMARY KEY,
                     paper_id TEXT REFERENCES papers(id) ON DELETE CASCADE,
@@ -48,7 +55,7 @@ class Database:
             """)
             
             # 模板表
-            await db.execute("""
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS templates (
                     id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
@@ -59,7 +66,7 @@ class Database:
             """)
             
             # 用户配置表
-            await db.execute("""
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS user_config (
                     key TEXT PRIMARY KEY,
                     value TEXT
@@ -67,7 +74,7 @@ class Database:
             """)
             
             # 自定义 pipeline 表
-            await db.execute("""
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS pipelines (
                     id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
@@ -79,9 +86,9 @@ class Database:
             """)
             
             # 索引
-            await db.execute("CREATE INDEX IF NOT EXISTS idx_sections_paper ON sections(paper_id)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_sections_paper ON sections(paper_id)")
             
-            await db.commit()
+            await conn.commit()
     
     async def execute(self, sql: str, parameters: tuple = ()):
         """执行 SQL"""
@@ -110,11 +117,11 @@ class Database:
     
     # === 论文操作 ===
     
-    async def create_paper(self, paper_id: str, title: str, template_id: str, outline: dict = None):
+    async def create_paper(self, paper_id: str, title: str, template_id: str, outline: dict = None, target_words: int = 8000):
         outline_json = json.dumps(outline, ensure_ascii=False) if outline else None
         await self.execute(
-            "INSERT INTO papers (id, title, template_id, outline) VALUES (?, ?, ?, ?)",
-            (paper_id, title, template_id, outline_json)
+            "INSERT INTO papers (id, title, template_id, outline, target_words) VALUES (?, ?, ?, ?, ?)",
+            (paper_id, title, template_id, outline_json, target_words)
         )
     
     async def get_paper(self, paper_id: str) -> Optional[Dict[str, Any]]:
@@ -124,7 +131,7 @@ class Database:
         return row
     
     async def update_paper(self, paper_id: str, **kwargs):
-        allowed = {"title", "template_id", "outline", "content"}
+        allowed = {"title", "template_id", "outline", "content", "target_words"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return

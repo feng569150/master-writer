@@ -163,6 +163,11 @@
                     <input type="text" id="new-paper-title" class="input" placeholder="请输入论文题目">
                 </div>
                 <div class="mb-4">
+                    <label class="form-label">目标字数（课程论文可据此调整）</label>
+                    <input type="number" id="new-paper-words" class="input" value="8000" min="1000" step="500">
+                    <p class="text-xs text-gray-400 mt-1">一键成文会按此字数要求，分章、分段落续写直至达标</p>
+                </div>
+                <div class="mb-4">
                     <label class="form-label">模板</label>
                     <select id="new-paper-template" class="select">
                         <option value="default">默认模板（主流论文格式）</option>

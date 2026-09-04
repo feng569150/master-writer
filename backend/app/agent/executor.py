@@ -52,6 +52,30 @@ def update_section(state: Dict[str, Any], section_type: str, title: str, content
     )
 
 
+def append_section(state: Dict[str, Any], title: str, content: str):
+    """按标题找到章节并追加内容（分段续写用）；找不到则新建"""
+    sections = state.setdefault("sections", [])
+    for s in sections:
+        if s.get("title") == title:
+            prev = s.get("content", "") or ""
+            s["content"] = (prev + "\n\n" + content).strip()
+            return
+    sections.append({"type": "body", "title": title, "content": content, "order": len(sections)})
+
+
+def extract_citations(sections: list) -> int:
+    """统计正文中引用标注 [n] 的最大编号（用于参考文献数量和编号对应）"""
+    max_n = 0
+    seen = set()
+    for s in sections or []:
+        for m in re.finditer(r"\[(\d{1,3})\]", s.get("content", "") or ""):
+            n = int(m.group(1))
+            seen.add(n)
+            max_n = max(max_n, n)
+    # 取连续编号数量（缺号按最大号处理）
+    return max(seen) if seen else 0
+
+
 def save_output(state: Dict[str, Any], save_to: str, output_format: str, text: str) -> None:
     """按保存目标把生成结果写入论文状态"""
     # 解析输出（JSON 或纯文本）

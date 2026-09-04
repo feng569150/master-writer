@@ -123,6 +123,66 @@ class AgentTest(unittest.TestCase):
         conc = next(s for s in sections if s["type"] == "conclusion")
         self.assertGreater(len(conc["content"]), 10, "结论应有内容")
 
+    def test_target_words_persist(self):
+        """目标字数应随论文创建/更新持久化"""
+        async def _run():
+            pid = "wordstest1"
+            await db.create_paper(pid, "字数测试", "default", None, target_words=3000)
+            paper = await db.get_paper(pid)
+            # 更新
+            await db.update_paper(pid, target_words=5000)
+            paper2 = await db.get_paper(pid)
+            return paper.get("target_words"), paper2.get("target_words")
+
+        w1, w2 = asyncio.run(_run())
+        self.assertEqual(w1, 3000)
+        self.assertEqual(w2, 5000)
+
+    def test_segmented_body_writing(self):
+        """repeat 分段续写：章节内容应跨多段累计变长"""
+        async def _run():
+            agent = WritingAgent(self.paper_id)
+            await agent.load()
+            agent.state["outline"] = {"sections": [{"level": 1, "title": "第一章 概述", "word_count": 3000, "children": []}]}
+            custom = {
+                "name": "分段测试",
+                "steps": [
+                    {
+                        "loop": {
+                            "over": "outline.sections", "as": "section",
+                            "steps": [{
+                                "skill": "body_writing",
+                                "inputs": {"section_title": "{{section.title}}", "section_outline": "{{section}}"},
+                                "save_to": "sections",
+                                "repeat": "{{section.word_count}}",
+                            }],
+                        }
+                    }
+                ],
+            }
+            async for _ in agent.run_pipeline(custom, {}, stream=True):
+                pass
+            sections = await db.get_sections(self.paper_id)
+            sec = next((s for s in sections if s["title"] == "第一章 概述"), None)
+            return len(sec["content"]) if sec else 0
+
+        length = asyncio.run(_run())
+        # 3000 字 → ceil(3000/800)=4 段，每段 mock ~180 字，累计应明显多于单段
+        self.assertGreaterEqual(length, 400, "多段续写应累计出较长内容")
+
+    def test_citations_discovered_by_references(self):
+        """references 步骤应自动统计正文引文数并注入 count（编号一致）"""
+        async def _run():
+            from backend.app.agent.executor import extract_citations
+            sections = [
+                {"type": "body", "title": "第一章", "content": "研究[1]指出，深度学习[2]应用广泛。相关方法见文献[3]。"},
+                {"type": "body", "title": "第二章", "content": "背景如[1]所述。"},
+            ]
+            n = extract_citations(sections)
+            return n
+
+        self.assertEqual(asyncio.run(_run()), 3, "应统计出最大引文编号")
+
     def test_custom_pipeline_dict(self):
         """用户自定义 pipeline（dict 形式）应可执行"""
         async def _run():

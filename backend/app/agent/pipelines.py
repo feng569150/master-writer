@@ -14,9 +14,13 @@ from backend.app.database import db
 BUILTIN_PIPELINES: Dict[str, dict] = {
     "full_paper": {
         "name": "一键成文",
-        "description": "大纲 → 各章正文 → 摘要 → 参考文献",
+        "description": "大纲 → 各章正文（按目标字数分段续写） → 摘要 → 参考文献",
         "steps": [
-            {"skill": "paper_outline", "save_to": "outline"},
+            {
+                "skill": "paper_outline",
+                "inputs": {"word_count": "{{inputs.word_count}}"},
+                "save_to": "outline",
+            },
             {
                 "loop": {
                     "over": "outline.sections",
@@ -27,13 +31,16 @@ BUILTIN_PIPELINES: Dict[str, dict] = {
                             "inputs": {
                                 "section_title": "{{section.title}}",
                                 "section_outline": "{{section}}",
+                                "word_count": "{{section.word_count}}",
                             },
                             "save_to": "sections",
+                            # 按该章目标字数自动分段续写（每段约 800 字）
+                            "repeat": "{{section.word_count}}",
                         }
                     ],
                 }
             },
-            {"skill": "abstract", "inputs": {"count": 400}, "save_to": "abstract"},
+            {"skill": "abstract", "inputs": {"word_count": 400}, "save_to": "abstract"},
             {"skill": "references", "save_to": "references"},
         ],
     },
