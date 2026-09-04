@@ -12,3 +12,5 @@ jinja2==3.1.4
 pyyaml==6.0.1
 websockets==12.0
 aiosqlite==0.20.0
+# Windows 下 Word/WPS COM 转 PDF 需要（可选）
+pywin32>=306; platform_system == "Windows"

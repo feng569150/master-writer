@@ -578,6 +578,9 @@ const app = {
                                 <button onclick="app.exportPaper('docx')" class="btn btn-success btn-sm">
                                     <i class="fas fa-file-word"></i> Word
                                 </button>
+                                <button onclick="app.exportPaper('pdf')" class="btn btn-sm" style="background:#fee2e2;color:#b91c1c">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
                                 <button onclick="app.exportPaper('markdown')" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-file-code"></i> Markdown
                                 </button>
@@ -1096,6 +1099,7 @@ const app = {
             this.showToast('请先选择论文', 'error');
             return;
         }
+        if (format === 'pdf') this.showToast('正在生成 PDF（首次转换需启动 Office，稍候）...', 'info');
         try {
             const res = await fetch(`${API_BASE}/api/export/${format}`, {
                 method: 'POST',
