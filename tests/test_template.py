@@ -110,6 +110,27 @@ class TemplateEngineTest(unittest.TestCase):
         self.assertTrue(asyncio.run(_run()), "内置模板编辑应抛异常")
         self.assertEqual(TemplateEngine.get("default").name, "默认模板", "内置模板名不应变化")
 
+    def test_manual_create_partial_config(self):
+        """手动定义模板：仅填部分字段也应有完整默认配置"""
+        async def _run():
+            base = TemplateParser.get_default_template()
+            partial = dict(base)
+            partial.update({
+                "fonts": {"chinese": "仿宋", "size": 10.5},
+                "paragraph": {"line_spacing": 1.25},
+            })
+            t = await TemplateEngine.create_custom("manual_tpl", "手动模板", partial)
+            return t
+
+        t = asyncio.run(_run())
+        self.assertEqual(t.fonts.chinese, "仿宋")
+        self.assertEqual(t.fonts.size, 10.5)
+        self.assertEqual(t.paragraph.line_spacing, 1.25)
+        # 默认字段应保留
+        self.assertEqual(t.fonts.english, "Times New Roman")
+        self.assertEqual(t.page.margin_top, 2.54)
+        self.assertIn("1", t.headings)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

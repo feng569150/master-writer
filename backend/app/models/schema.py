@@ -30,7 +30,7 @@ class PageConfig(BaseModel):
 class FontConfig(BaseModel):
     chinese: str = "宋体"
     english: str = "Times New Roman"
-    size: int = 12  # 磅
+    size: float = 12.0  # 磅（支持 10.5 等五号字）
     heading_font: str = "黑体"
     heading_english: str = "Arial"
 
@@ -47,7 +47,7 @@ class HeadingConfig(BaseModel):
     level: int
     font: str
     font_en: str
-    size: int
+    size: float
     bold: bool = True
     alignment: str = "left"
     space_before: float = 12  # pt

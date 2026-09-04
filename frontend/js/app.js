@@ -341,7 +341,32 @@ const app = {
         }
     },
 
-    // === 模板编辑 ===
+    // === 模板编辑/新建 ===
+    async showTemplateCreate() {
+        // 新建模式：填入默认值
+        this._editTemplate = null;
+        document.getElementById('edit-template-id').value = '';
+        document.getElementById('edit-name').value = '';
+        document.getElementById('edit-margin-top').value = 2.54;
+        document.getElementById('edit-margin-bottom').value = 2.54;
+        document.getElementById('edit-margin-left').value = 3.17;
+        document.getElementById('edit-margin-right').value = 3.17;
+        document.getElementById('edit-font-zh').value = '宋体';
+        document.getElementById('edit-font-en').value = 'Times New Roman';
+        document.getElementById('edit-font-size').value = 12;
+        document.getElementById('edit-line-spacing').value = 1.5;
+        document.getElementById('edit-indent').value = 0.74;
+        document.getElementById('edit-h1-font').value = '黑体';
+        document.getElementById('edit-h1-size').value = 16;
+        document.getElementById('edit-h2-font').value = '黑体';
+        document.getElementById('edit-h2-size').value = 14;
+        document.getElementById('edit-h3-font').value = '黑体';
+        document.getElementById('edit-h3-size').value = 12;
+        document.getElementById('modal-edit-template-title').textContent = '新建模板（手动定义）';
+        document.getElementById('modal-edit-template-save-btn').innerHTML = '<i class="fas fa-check"></i> 创建模板';
+        this.showModal('modal-edit-template');
+    },
+
     async showTemplateEdit(id) {
         try {
             const res = await this.api(`/api/templates/${id}`);
@@ -351,6 +376,8 @@ const app = {
             }
             const t = res.data;
             this._editTemplate = t;
+            document.getElementById('modal-edit-template-title').textContent = '编辑模板';
+            document.getElementById('modal-edit-template-save-btn').innerHTML = '<i class="fas fa-save"></i> 保存修改';
             document.getElementById('edit-template-id').value = t.id;
             document.getElementById('edit-name').value = t.name || '';
             document.getElementById('edit-margin-top').value = t.page?.margin_top ?? 2.54;
@@ -375,11 +402,6 @@ const app = {
     },
 
     async saveTemplateEdit() {
-        const t = this._editTemplate;
-        if (!t) {
-            this.showToast('请先选择要编辑的模板', 'error');
-            return;
-        }
         const num = (id, def) => parseFloat(document.getElementById(id).value) || def;
         const str = (id, def) => document.getElementById(id).value.trim() || def;
 
@@ -407,20 +429,30 @@ const app = {
         };
 
         try {
-            const res = await this.api(`/api/templates/${t.id}`, {
-                method: 'PUT',
-                body: JSON.stringify({ name: str('edit-name', t.name || '模板'), config })
-            });
+            let res;
+            if (this._editTemplate) {
+                // 编辑模式：PUT
+                res = await this.api(`/api/templates/${this._editTemplate.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ name: str('edit-name', this._editTemplate.name || '模板'), config })
+                });
+            } else {
+                // 新建模式：POST
+                res = await this.api('/api/templates', {
+                    method: 'POST',
+                    body: JSON.stringify({ name: str('edit-name', '自定义模板'), config })
+                });
+            }
             if (res.success) {
                 this.closeModal('modal-edit-template');
-                this.showToast('模板已更新');
+                this.showToast(this._editTemplate ? '模板已更新' : '模板已创建');
                 await this.loadTemplates();
                 this.showTemplateManage();
             } else {
-                this.showToast(res.message || '更新失败', 'error');
+                this.showToast(res.message || '操作失败', 'error');
             }
         } catch (e) {
-            this.showToast('更新失败: ' + e.message, 'error');
+            this.showToast('操作失败: ' + e.message, 'error');
         }
     },
 

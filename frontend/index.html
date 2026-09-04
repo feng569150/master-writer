@@ -263,8 +263,11 @@
                 </div>
             </div>
             <div class="modal-footer">
+                <button onclick="app.showTemplateCreate()" class="btn btn-success btn-sm">
+                    <i class="fas fa-plus"></i> 新建模板
+                </button>
                 <button onclick="app.showModal('modal-upload-template')" class="btn btn-secondary btn-sm">
-                    <i class="fas fa-upload"></i> 上传新模板
+                    <i class="fas fa-upload"></i> 上传模板
                 </button>
                 <button onclick="app.closeModal('modal-template-manage')" class="btn btn-secondary">关闭</button>
             </div>
@@ -275,11 +278,12 @@
     <div id="modal-edit-template" class="modal-overlay hidden">
         <div class="modal modal-lg">
             <div class="modal-header flex justify-between items-center">
-                <h3 class="modal-title">编辑模板</h3>
+                <h3 class="modal-title" id="modal-edit-template-title">编辑模板</h3>
                 <button onclick="app.closeModal('modal-edit-template')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="edit-template-id">
+                <div class="mb-2 text-xs text-gray-400">* 留空或未填写的项将使用默认值（A4 / 宋体小四 / 1.5倍行距 / 黑体标题）</div>
                 <div class="mb-4">
                     <label class="form-label">模板名称</label>
                     <input type="text" id="edit-name" class="input" placeholder="模板名称">
@@ -328,7 +332,7 @@
             </div>
             <div class="modal-footer">
                 <button onclick="app.closeModal('modal-edit-template')" class="btn btn-secondary">取消</button>
-                <button onclick="app.saveTemplateEdit()" class="btn btn-primary"><i class="fas fa-save"></i> 保存修改</button>
+                <button onclick="app.saveTemplateEdit()" class="btn btn-primary" id="modal-edit-template-save-btn"><i class="fas fa-save"></i> 保存修改</button>
             </div>
         </div>
     </div>
