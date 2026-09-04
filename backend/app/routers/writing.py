@@ -117,24 +117,24 @@ async def list_skills(category: str = None):
 
 @router.post("/skills/{skill_id}/execute")
 async def execute_skill(skill_id: str, req: SkillExecuteRequest):
-    """执行单个 Skill（新版 Agent 入口）"""
+    """执行单个 Skill（支持显式 save_to 落库；未指定时按 Skill 的 auto_save 配置）"""
+    async def _run():
+        agent = await create_agent(req.paper_id)
+        async for chunk in agent.run_skill(
+            skill_id, req.inputs, stream=req.stream, save_to=req.save_to
+        ):
+            yield chunk
+
     if req.stream:
         async def event_generator():
-            agent = await create_agent(req.paper_id)
-            async for chunk in agent.run_skill(skill_id, req.inputs, stream=True):
+            async for chunk in _run():
                 yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
-        
-        return StreamingResponse(
-            event_generator(),
-            media_type="text/event-stream"
-        )
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
     else:
-        agent = await create_agent(req.paper_id)
         result = ""
-        async for chunk in agent.run_skill(skill_id, req.inputs, stream=False):
+        async for chunk in _run():
             result += chunk
-        
         try:
             data = json.loads(result)
             return ResponseBase(data=data)

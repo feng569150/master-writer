@@ -586,52 +586,63 @@ const app = {
                     </div>
                 </div>
 
-                <!-- 工具栏 -->
+                <!-- 工具栏：主要功能 3 个，单步工具收进折叠区 -->
                 <div class="card">
                     <div class="card-body">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3">写作工具</h3>
-                        <div class="tool-grid">
-                            <button onclick="app.runSkill('paper_outline')" class="tool-btn">
-                                <i class="fas fa-sitemap text-blue-600"></i>
-                                <span>生成大纲</span>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                            <button onclick="app.runPipeline('full_paper')" class="p-5 rounded-xl border-2 border-blue-500 bg-blue-50 hover:bg-blue-100 transition text-left">
+                                <i class="fas fa-magic text-blue-600 text-2xl mb-2 block"></i>
+                                <span class="font-semibold text-blue-900">一键成文</span>
+                                <span class="block text-xs text-blue-600 mt-1">大纲 → 正文 → 摘要 → 参考文献 全自动</span>
                             </button>
-                            <button onclick="app.runSkill('introduction')" class="tool-btn">
-                                <i class="fas fa-play text-green-600"></i>
-                                <span>引言</span>
+                            <button onclick="app.runSkill('paper_outline')" class="p-5 rounded-xl border border-gray-200 hover:border-blue-300 transition text-left">
+                                <i class="fas fa-sitemap text-gray-600 text-2xl mb-2 block"></i>
+                                <span class="font-semibold text-gray-800">生成大纲（目录）</span>
+                                <span class="block text-xs text-gray-500 mt-1">生成/更新论文三级大纲</span>
                             </button>
-                            <button onclick="app.runSkill('body_writing')" class="tool-btn">
-                                <i class="fas fa-paragraph text-purple-600"></i>
-                                <span>正文</span>
-                            </button>
-                            <button onclick="app.runSkill('conclusion')" class="tool-btn">
-                                <i class="fas fa-flag-checkered text-orange-600"></i>
-                                <span>结论</span>
-                            </button>
-                            <button onclick="app.runSkill('abstract')" class="tool-btn">
-                                <i class="fas fa-compress text-pink-600"></i>
-                                <span>摘要</span>
-                            </button>
-                            <button onclick="app.runSkill('references')" class="tool-btn">
-                                <i class="fas fa-book-open text-indigo-600"></i>
-                                <span>参考文献</span>
-                            </button>
-                            <button onclick="app.runPipeline('full_paper')" class="tool-btn" style="border-color:#bfdbfe;background:#eff6ff">
-                                <i class="fas fa-magic text-blue-600"></i>
-                                <span>一键成文</span>
-                            </button>
-                            <button onclick="app.runSkill('polish')" class="tool-btn">
-                                <i class="fas fa-magic text-yellow-600"></i>
-                                <span>润色</span>
-                            </button>
-                            <button onclick="app.runSkill('reduce_similarity')" class="tool-btn">
-                                <i class="fas fa-compress-arrows-alt text-red-600"></i>
-                                <span>降重</span>
-                            </button>
-                            <button onclick="app.runPipeline('polish_paper')" class="tool-btn" style="border-color:#fef3c7;background:#fffbeb">
-                                <i class="fas fa-wand-magic text-amber-600"></i>
-                                <span>一键润色全文</span>
+                            <button onclick="app.runPipeline('polish_paper')" class="p-5 rounded-xl border-2 border-amber-400 bg-amber-50 hover:bg-amber-100 transition text-left">
+                                <i class="fas fa-wand-magic text-amber-600 text-2xl mb-2 block"></i>
+                                <span class="font-semibold text-amber-900">全文润色</span>
+                                <span class="block text-xs text-amber-600 mt-1">对已有全文逐章润色优化</span>
                             </button>
                         </div>
+
+                        <details class="group">
+                            <summary class="cursor-pointer select-none text-sm font-medium text-gray-500 hover:text-gray-700 py-1">
+                                <i class="fas fa-chevron-down mr-1 transition group-open:rotate-180"></i>
+                                更多工具（单项生成：引言 / 正文 / 结论 / 摘要 / 参考文献 / 降重）
+                            </summary>
+                            <div class="tool-grid mt-2">
+                                <button onclick="app.runSkill('introduction')" class="tool-btn">
+                                    <i class="fas fa-play text-green-600"></i>
+                                    <span>引言</span>
+                                </button>
+                                <button onclick="app.runSkill('body_writing')" class="tool-btn">
+                                    <i class="fas fa-paragraph text-purple-600"></i>
+                                    <span>正文</span>
+                                </button>
+                                <button onclick="app.runSkill('conclusion')" class="tool-btn">
+                                    <i class="fas fa-flag-checkered text-orange-600"></i>
+                                    <span>结论</span>
+                                </button>
+                                <button onclick="app.runSkill('abstract')" class="tool-btn">
+                                    <i class="fas fa-compress text-pink-600"></i>
+                                    <span>摘要</span>
+                                </button>
+                                <button onclick="app.runSkill('references')" class="tool-btn">
+                                    <i class="fas fa-book-open text-indigo-600"></i>
+                                    <span>参考文献</span>
+                                </button>
+                                <button onclick="app.runSkill('reduce_similarity')" class="tool-btn">
+                                    <i class="fas fa-compress-arrows-alt text-red-600"></i>
+                                    <span>降重</span>
+                                </button>
+                                <button onclick="app.runSkill('polish')" class="tool-btn">
+                                    <i class="fas fa-magic text-yellow-600"></i>
+                                    <span>润色段落</span>
+                                </button>
+                            </div>
+                        </details>
                     </div>
                 </div>
 
@@ -906,11 +917,12 @@ const app = {
             this.showToast('请先选择一篇论文', 'error');
             return;
         }
-        const inputs = this.buildSkillInputs(skillId);
-        if (inputs === null) return;
+        const plan = this.buildSkillInputs(skillId);
+        if (plan === null) return;
         await this.streamExecute(`/api/skills/${skillId}/execute`, {
             paper_id: this.state.currentPaper.id,
-            inputs,
+            inputs: plan.inputs,
+            save_to: plan.save_to || null,
             stream: true
         });
     },
@@ -930,29 +942,43 @@ const app = {
     buildSkillInputs(skillId) {
         const paper = this.state.currentPaper;
         const inputs = {};
+        let save_to = null;
         if (skillId === 'paper_outline') {
             inputs.topic = paper.title;
             inputs.paper_type = paper.template_id;
             inputs.word_count = 10000;
-        } else if (skillId === 'introduction' || skillId === 'conclusion') {
+            save_to = 'outline';
+        } else if (skillId === 'introduction') {
             inputs.topic = paper.title;
+            inputs.section_title = '引言';
+            inputs.word_count = 1500;
+            save_to = 'sections';
+        } else if (skillId === 'conclusion') {
+            inputs.topic = paper.title;
+            inputs.section_title = '结论';
+            inputs.word_count = 1000;
+            save_to = 'sections';
         } else if (skillId === 'body_writing') {
             const title = prompt('请输入当前章节标题：', '第一章 绪论');
             if (!title) return null;
             inputs.section_title = title;
             inputs.word_count = 2000;
+            save_to = 'sections';
         } else if (skillId === 'abstract') {
             inputs.full_text = (paper.sections || []).map(s => s.content).join('\n\n');
+            save_to = 'abstract';
         } else if (skillId === 'references') {
             inputs.topic = paper.title;
             inputs.full_text = (paper.sections || []).map(s => s.content).join('\n\n');
             inputs.count = 10;
+            save_to = 'references';
         } else if (skillId === 'polish' || skillId === 'reduce_similarity') {
             const text = prompt('请输入要处理的文本：');
             if (!text) return null;
             inputs.text = text;
+            // 工具类不自动落库，结果在下方展示区，可用"插入章节"手动保存
         }
-        return inputs;
+        return { inputs, save_to };
     },
 
     async streamExecute(url, body) {

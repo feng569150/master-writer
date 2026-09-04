@@ -98,11 +98,17 @@ class WritingAgent:
 
         # 保存：优先显式 save_to，其次用 Skill 定义的 auto_save 配置
         target = save_to or (skill.output.save_target if skill and skill.output.auto_save else None)
-        if target and buffer:
+        if target == "sections" and buffer:
+            # 需要章节标题来定位/新建章节（结论/引言/正文等）
+            title = (inputs or {}).get("section_title") or "生成内容"
+            sec_type = _infer_section_type(title)
+            executor.update_section(self.state, sec_type, title, buffer)
+            await self.save()
+        elif target and buffer:
             executor.save_output(self.state, target, output_format, buffer)
             await self.save()
         elif buffer:
-            # 无保存目标也持久化当前章节状态（保险起见）
+            # 无保存目标：结果仅展示，持久化当前章节状态即可
             await self.save()
 
     async def run_pipeline(

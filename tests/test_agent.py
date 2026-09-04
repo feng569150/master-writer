@@ -97,6 +97,32 @@ class AgentTest(unittest.TestCase):
         self.assertIn("references", types, "应有参考文献")
         self.assertGreaterEqual(types.count("body"), 1, "应有正文")
 
+    def test_individual_steps_persist(self):
+        """单步生成（摘要+结论）都应保存，导出时不会缺章节"""
+        async def _run():
+            agent = WritingAgent(self.paper_id)
+            await agent.load()
+            # 摘要
+            async for _ in agent.run_skill(
+                "abstract", {"full_text": "正文内容"}, stream=False, save_to="abstract"
+            ):
+                pass
+            # 结论（单步，save_to=sections + section_title）
+            async for _ in agent.run_skill(
+                "conclusion", {"topic": "测试", "section_title": "结论"},
+                stream=False, save_to="sections",
+            ):
+                pass
+            sections = await db.get_sections(self.paper_id)
+            return sections
+
+        sections = asyncio.run(_run())
+        types = [s["type"] for s in sections]
+        self.assertIn("abstract", types, "摘要应落库")
+        self.assertIn("conclusion", types, "结论应落库")
+        conc = next(s for s in sections if s["type"] == "conclusion")
+        self.assertGreater(len(conc["content"]), 10, "结论应有内容")
+
     def test_custom_pipeline_dict(self):
         """用户自定义 pipeline（dict 形式）应可执行"""
         async def _run():

@@ -166,6 +166,7 @@ class SkillExecuteRequest(BaseModel):
     paper_id: Optional[str] = None
     inputs: Dict[str, Any] = Field(default_factory=dict)
     stream: bool = True
+    save_to: Optional[str] = None  # 显式指定保存目标（outline/abstract/references/sections）
 
 
 class SkillPipelineRequest(BaseModel):
