@@ -312,6 +312,20 @@ class ModelManager:
     _configs: Dict[str, ModelConfig] = {}
     _default_provider: Optional[str] = None
 
+    @staticmethod
+    def mask_api_key(key: str) -> str:
+        """脱敏 API Key：只保留前 3 后 4，中间掩码"""
+        if not key:
+            return ""
+        if len(key) <= 10:
+            return key[0] + "*" * (len(key) - 2) + key[-1] if len(key) > 2 else "*" * len(key)
+        return key[:3] + "*" * 8 + key[-4:]
+
+    @staticmethod
+    def is_masked(key: str) -> bool:
+        """判断 key 是否为脱敏值（含 *）"""
+        return bool(key and "*" in key)
+
     @classmethod
     async def initialize(cls):
         """初始化：从数据库加载配置，mock 永远可用"""
@@ -476,7 +490,10 @@ class ModelManager:
 
     @classmethod
     async def save_config(cls, provider: str, api_key: str, model: str, base_url: str = "", set_default: bool = True):
-        """保存模型配置到数据库"""
+        """保存模型配置到数据库（脱敏值视为未变更，保留原 Key）"""
+        old = cls._configs.get(provider)
+        if cls.is_masked(api_key) and old and old.api_key:
+            api_key = old.api_key  # 传入的是脱敏显示值，保留原 Key
         cfg = {"api_key": api_key, "model": model, "base_url": base_url}
         await db.set_config(f"model_{provider}", json.dumps(cfg, ensure_ascii=False))
         if set_default:

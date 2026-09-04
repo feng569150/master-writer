@@ -36,7 +36,7 @@ async def list_models():
 
 @router.get("/models/{provider}")
 async def get_model(provider: str):
-    """获取单个模型已保存配置（回填设置页）"""
+    """获取单个模型已保存配置（回填设置页；Key 脱敏显示）"""
     cfg = ModelManager.get_config(provider)
     if not cfg:
         return JSONResponse(
@@ -44,7 +44,12 @@ async def get_model(provider: str):
             content={"success": False, "message": f"模型 {provider} 无保存配置"}
         )
     return ResponseBase(
-        data={"provider": provider, "api_key": cfg.api_key or "", "model": cfg.model, "base_url": cfg.base_url or ""}
+        data={
+            "provider": provider,
+            "api_key": ModelManager.mask_api_key(cfg.api_key or ""),
+            "model": cfg.model,
+            "base_url": cfg.base_url or "",
+        }
     )
 
 

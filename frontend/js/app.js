@@ -81,11 +81,15 @@ const app = {
         }
         try {
             const res = await this.api(`/api/config/models/${provider}`);
+            const keyInput = document.getElementById('setting-apikey');
+            const modelInput = document.getElementById('setting-model');
+            const baseInput = document.getElementById('setting-baseurl');
             if (res.success && res.data) {
-                document.getElementById('setting-apikey').value = res.data.api_key || '';
-                document.getElementById('setting-model').value = res.data.model || '';
-                document.getElementById('setting-baseurl').value =
-                    res.data.base_url || this.defaultBaseUrl(provider);
+                keyInput.value = res.data.api_key || '';
+                keyInput.placeholder = res.data.api_key && res.data.api_key.includes('*')
+                    ? '密钥已保存，无需重复填写' : 'sk-... 或 Bearer 令牌';
+                modelInput.value = res.data.model || '';
+                baseInput.value = res.data.base_url || this.defaultBaseUrl(provider);
             } else {
                 document.getElementById('setting-apikey').value = '';
                 document.getElementById('setting-model').value = this.defaultModelFor(provider);

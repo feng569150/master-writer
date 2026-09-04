@@ -64,14 +64,28 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS
+# CORS：仅允许本机来源（127.0.0.1 / localhost），防止被其他网页跨域读取
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[
+        f"http://{settings.HOST}:{settings.PORT}",
+        f"http://localhost:{settings.PORT}",
+        f"http://127.0.0.1:{settings.PORT}",
+    ],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """基础安全响应头"""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
 
 
 @app.middleware("http")
