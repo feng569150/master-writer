@@ -74,12 +74,24 @@ class OpenAICompatibleProvider(ModelProvider):
                         break
                     try:
                         chunk = json.loads(data)
-                        delta = chunk.get("choices", [{}])[0].get("delta", {})
-                        content = delta.get("content", "")
+                        content = type(self)._parse_stream_chunk(chunk)
                         if content:
                             yield content
                     except json.JSONDecodeError:
                         continue
+
+    @staticmethod
+    def _parse_stream_chunk(chunk: dict) -> str:
+        """从流式 chunk 提取文本内容，容错各种非标准格式"""
+        # 错误块
+        if chunk.get("error"):
+            return ""
+        # 缺失或空 choices（如用法统计块）
+        choices = chunk.get("choices") or []
+        if not choices:
+            return ""
+        delta = choices[0].get("delta") or {}
+        return delta.get("content") or ""
 
     async def close(self):
         await self.client.aclose()
