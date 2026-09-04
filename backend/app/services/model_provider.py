@@ -319,7 +319,7 @@ class ModelManager:
         )
 
         # 从数据库加载用户配置
-        provider_names = ["openai", "zhipu", "deepseek", "paperpass"]
+        provider_names = ["openai", "zhipu", "deepseek", "paperpass", "custom"]
         for name in provider_names:
             stored = await db.get_config(f"model_{name}")
             if stored:
@@ -373,6 +373,72 @@ class ModelManager:
     @classmethod
     def get_default_name(cls) -> str:
         return cls._default_provider or "mock"
+
+    @classmethod
+    def get_config(cls, provider: str) -> Optional[ModelConfig]:
+        """获取指定 provider 的配置（可能为 None）"""
+        return cls._configs.get(provider)
+
+    @classmethod
+    async def test_connection(
+        cls,
+        provider: str,
+        api_key: str = "",
+        model: str = "",
+        base_url: str = "",
+    ) -> tuple:
+        """测试模型连接：发最小请求验证配置可用，返回 (ok, message, latency_ms)"""
+        import time
+        start = time.monotonic()
+        try:
+            if provider == "ollama":
+                client = httpx.AsyncClient(timeout=15.0)
+                try:
+                    resp = await client.get(
+                        (base_url or settings.OLLAMA_BASE_URL).rstrip("/") + "/api/tags"
+                    )
+                    ok = resp.status_code == 200
+                    msg = f"Ollama 连接成功" if ok else f"Ollama 响应异常 ({resp.status_code})"
+                    return ok, msg, int((time.monotonic() - start) * 1000)
+                finally:
+                    await client.aclose()
+
+            elif provider == "mock":
+                return True, "本地模拟模式（无需测试）", 0
+
+            else:
+                # OpenAI 兼容端点
+                if not model or not api_key or not base_url:
+                    return False, "请填写完整的 API Key、模型名和接口地址", 0
+                client = httpx.AsyncClient(timeout=30.0)
+                try:
+                    resp = await client.post(
+                        base_url.rstrip("/") + "/chat/completions",
+                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                        json={
+                            "model": model,
+                            "messages": [{"role": "user", "content": "ping"}],
+                            "max_tokens": 5,
+                            "stream": False,
+                        },
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        reply = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+                        ms = int((time.monotonic() - start) * 1000)
+                        return True, f"连接成功 ({ms}ms)，模型回复: {reply[:40]}", ms
+                    else:
+                        detail = resp.text[:200]
+                        ms = int((time.monotonic() - start) * 1000)
+                        return False, f"HTTP {resp.status_code}: {detail}", ms
+                finally:
+                    await client.aclose()
+        except httpx.HTTPError as e:
+            ms = int((time.monotonic() - start) * 1000)
+            return False, f"网络错误: {e.__class__.__name__} ({ms}ms)，请检查地址是否可达", ms
+        except Exception as e:
+            ms = int((time.monotonic() - start) * 1000)
+            return False, f"测试失败: {e} ({ms}ms)", ms
 
     @classmethod
     def list_available(cls) -> List[Dict[str, Any]]:

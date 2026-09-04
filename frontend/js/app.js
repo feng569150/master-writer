@@ -64,14 +64,102 @@ const app = {
 
     async loadConfiguredModels() {
         try {
-            const res = await this.api('/api/config/models');
-            const models = res.data || [];
-            const def = models.find(m => m.default);
-            if (def) {
-                const sel = document.getElementById('setting-provider');
-                if (sel) sel.value = def.name;
+            const listRes = await this.api('/api/config/models');
+            const def = (listRes.data || []).find(m => m.default);
+            const sel = document.getElementById('setting-provider');
+            if (def && sel) sel.value = def.name;
+            await this.loadProviderConfig(sel ? sel.value : 'mock');
+        } catch (e) {}
+    },
+
+    async loadProviderConfig(provider) {
+        if (provider === 'mock') {
+            document.getElementById('setting-apikey').value = '';
+            document.getElementById('setting-model').value = '';
+            document.getElementById('setting-baseurl').value = '';
+            this.onProviderChange();
+            return;
+        }
+        try {
+            const res = await this.api(`/api/config/models/${provider}`);
+            if (res.success && res.data) {
+                document.getElementById('setting-apikey').value = res.data.api_key || '';
+                document.getElementById('setting-model').value = res.data.model || '';
+                document.getElementById('setting-baseurl').value =
+                    res.data.base_url || this.defaultBaseUrl(provider);
+            } else {
+                document.getElementById('setting-apikey').value = '';
+                document.getElementById('setting-model').value = this.defaultModelFor(provider);
+                document.getElementById('setting-baseurl').value = this.defaultBaseUrl(provider);
             }
         } catch (e) {}
+        this.onProviderChange();
+    },
+
+    onProviderChange() {
+        const provider = document.getElementById('setting-provider').value;
+        const baseUrlWrap = document.getElementById('setting-baseurl-wrap');
+        if (provider === 'custom') {
+            baseUrlWrap.style.display = '';
+        } else if (provider === 'mock') {
+            baseUrlWrap.style.display = 'none';
+            document.getElementById('setting-apikey').value = '';
+            document.getElementById('setting-model').value = 'mock-local';
+        } else {
+            baseUrlWrap.style.display = '';
+            document.getElementById('setting-baseurl').value = this.defaultBaseUrl(provider);
+        }
+    },
+
+    defaultBaseUrl(provider) {
+        return {
+            openai: 'https://api.openai.com/v1',
+            zhipu: 'https://open.bigmodel.cn/api/paas/v4',
+            deepseek: 'https://api.deepseek.com/v1',
+            ollama: 'http://localhost:11434',
+            custom: ''
+        }[provider] || '';
+    },
+
+    async testConnection() {
+        const provider = document.getElementById('setting-provider').value;
+        const apiKey = document.getElementById('setting-apikey').value.trim();
+        const model = document.getElementById('setting-model').value.trim();
+        const baseUrl = document.getElementById('setting-baseurl').value.trim();
+        const btn = document.getElementById('test-conn-btn');
+        const result = document.getElementById('test-conn-result');
+
+        if (provider === 'mock') {
+            result.innerHTML = '<span class="text-green-600"><i class="fas fa-check"></i> 模拟模式无需测试</span>';
+            return;
+        }
+        if (provider !== 'ollama' && (!apiKey || !model)) {
+            result.innerHTML = '<span class="text-red-600">请先填写 API Key 和模型名</span>';
+            return;
+        }
+
+        btn.innerHTML = '<div class="spinner" style="width:14px;height:14px"></div> 测试中...';
+        btn.disabled = true;
+        result.innerHTML = '';
+        try {
+            const res = await this.api('/api/config/models/test', {
+                method: 'POST',
+                body: JSON.stringify({ provider, api_key: apiKey, model, base_url: baseUrl })
+            });
+            if (res.success && res.data) {
+                const d = res.data;
+                result.innerHTML = d.ok
+                    ? `<span class="text-green-600"><i class="fas fa-check-circle"></i> ${d.message}</span>`
+                    : `<span class="text-red-600"><i class="fas fa-times-circle"></i> ${d.message}</span>`;
+            } else {
+                result.innerHTML = `<span class="text-red-600">${res.message || '测试失败'}</span>`;
+            }
+        } catch (e) {
+            result.innerHTML = `<span class="text-red-600">请求失败: ${e.message}</span>`;
+        } finally {
+            btn.innerHTML = '<i class="fas fa-plug"></i> 测试连接';
+            btn.disabled = false;
+        }
     },
 
     // === Tab ===
@@ -946,34 +1034,46 @@ const app = {
         const provider = document.getElementById('setting-provider').value;
         const apiKey = document.getElementById('setting-apikey').value.trim();
         const model = document.getElementById('setting-model').value.trim();
-        
+        const baseUrl = document.getElementById('setting-baseurl').value.trim();
+
+        let payload;
         if (provider === 'ollama') {
-            // Ollama 无需 Key，只需保存模型名
-            await this.api('/api/config/models', {
-                method: 'POST',
-                body: JSON.stringify({ provider: 'ollama', api_key: '', model: model || 'qwen2.5' })
-            });
+            payload = { provider: 'ollama', api_key: '', model: model || 'qwen2.5', base_url: baseUrl || 'http://localhost:11434' };
         } else if (provider === 'mock') {
-            await this.api('/api/config/models', {
-                method: 'POST',
-                body: JSON.stringify({ provider: 'mock', api_key: '', model: 'mock-local' })
-            });
+            payload = { provider: 'mock', api_key: '', model: 'mock-local' };
+        } else if (provider === 'custom') {
+            if (!apiKey || !model || !baseUrl) {
+                this.showToast('自定义供应商需填写 API Key、模型名和接口地址', 'error');
+                return;
+            }
+            payload = { provider: 'custom', api_key: apiKey, model, base_url: baseUrl };
         } else {
-            await this.api('/api/config/models', {
-                method: 'POST',
-                body: JSON.stringify({ provider, api_key: apiKey, model: model || this.defaultModelFor(provider) })
-            });
+            payload = {
+                provider,
+                api_key: apiKey,
+                model: model || this.defaultModelFor(provider),
+                base_url: baseUrl || this.defaultBaseUrl(provider)
+            };
         }
-        
-        this.closeModal('modal-settings');
-        this.showToast('模型配置已保存');
-        this.checkHealth();
+
+        const res = await this.api('/api/config/models', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        if (res.success) {
+            this.closeModal('modal-settings');
+            this.showToast('模型配置已保存');
+            this.checkHealth();
+        } else {
+            this.showToast(res.message || '保存失败', 'error');
+        }
     },
     defaultModelFor(provider) {
         return {
             openai: 'gpt-4o-mini',
             zhipu: 'glm-4-flash',
-            deepseek: 'deepseek-chat'
+            deepseek: 'deepseek-chat',
+            custom: '（填写你的模型名）'
         }[provider] || 'gpt-4o-mini';
     },
     showHelp() {

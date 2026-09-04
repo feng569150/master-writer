@@ -305,22 +305,34 @@
                     <h4 class="text-sm font-semibold text-gray-900 mb-3">AI 模型配置</h4>
                     <div class="space-y-3">
                         <div>
-                            <label class="form-label">默认模型</label>
-                            <select id="setting-provider" class="select">
+                            <label class="form-label">模型供应商</label>
+                            <select id="setting-provider" class="select" onchange="app.onProviderChange()">
                                 <option value="mock">本地模拟（无需 Key）</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="zhipu">智谱 AI</option>
                                 <option value="deepseek">DeepSeek</option>
                                 <option value="ollama">Ollama (本地)</option>
+                                <option value="custom">自定义 (OpenAI 兼容)</option>
                             </select>
                         </div>
                         <div>
                             <label class="form-label">API Key</label>
-                            <input type="password" id="setting-apikey" class="input" placeholder="输入 API Key">
+                            <input type="password" id="setting-apikey" class="input" placeholder="sk-... 或 Bearer 令牌">
                         </div>
                         <div>
                             <label class="form-label">模型名称</label>
-                            <input type="text" id="setting-model" class="input" placeholder="如: gpt-4o-mini">
+                            <input type="text" id="setting-model" class="input" placeholder="如: gpt-4o-mini / glm-4 / deepseek-chat / qwen-plus">
+                        </div>
+                        <div id="setting-baseurl-wrap">
+                            <label class="form-label">接口地址 (Base URL)</label>
+                            <input type="text" id="setting-baseurl" class="input" placeholder="https://api.xxx.com/v1">
+                            <p class="text-xs text-gray-400 mt-1">自定义供应商必填，其他可选覆盖</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="app.testConnection()" class="btn btn-secondary btn-sm flex-1" id="test-conn-btn">
+                                <i class="fas fa-plug"></i> 测试连接
+                            </button>
+                            <div id="test-conn-result" class="flex-1 text-sm flex items-center text-gray-500"></div>
                         </div>
                     </div>
                 </div>
