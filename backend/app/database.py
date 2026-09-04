@@ -194,6 +194,13 @@ class Database:
         for row in rows:
             row["config"] = json.loads(row["config"])
         return rows
+
+    async def delete_template(self, template_id: str):
+        """删除模板（仅允许自定义模板）"""
+        row = await self.fetchone("SELECT is_builtin FROM templates WHERE id = ?", (template_id,))
+        if row and row.get("is_builtin"):
+            raise ValueError(f"内置模板 {template_id} 不可删除")
+        await self.execute("DELETE FROM templates WHERE id = ?", (template_id,))
     
     # === 查重库操作 ===
     

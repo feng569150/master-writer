@@ -71,7 +71,7 @@ async def upload_template(file: UploadFile = File(...)):
         # 解析模板
         config = TemplateParser.parse_docx(temp_path)
         config["id"] = f"custom_{uuid.uuid4().hex[:8]}"
-        config["name"] = file.filename.replace(file_ext, "")
+        config["name"] = file.filename.replace(file_ext, "").rstrip(". .").rstrip() or "自定义模板"
         
         # 清理临时文件
         os.remove(temp_path)
@@ -95,3 +95,38 @@ async def upload_template(file: UploadFile = File(...)):
 async def get_default_template():
     """获取默认模板配置"""
     return ResponseBase(data=TemplateParser.get_default_template())
+
+
+@router.get("/manage/list")
+async def manage_list():
+    """模板管理列表（含内置标记）"""
+    rows = await TemplateEngine.list_raw()
+    result = []
+    for r in rows:
+        config = r.get("config") or {}
+        result.append({
+            "id": r["id"],
+            "name": r.get("name", config.get("name", r["id"])),
+            "description": config.get("description", ""),
+            "is_builtin": bool(r.get("is_builtin")),
+            "count": len(TemplateEngine.list_all()),
+        })
+    return ResponseBase(data=result)
+
+
+@router.delete("/{template_id}")
+async def delete_template(template_id: str):
+    """删除自定义模板（内置模板不可删除）"""
+    try:
+        await TemplateEngine.delete_custom(template_id)
+        return ResponseBase(message=f"模板 {template_id} 已删除")
+    except ValueError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": str(e)}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": f"删除失败: {str(e)}"}
+        )

@@ -286,6 +286,55 @@ const app = {
         this.state.pendingTemplate = null;
     },
 
+    // === 模板管理 ===
+    async showTemplateManage() {
+        this.showModal('modal-template-manage');
+        const container = document.getElementById('template-manage-list');
+        container.innerHTML = '<div class="text-center py-4 text-gray-400">加载中...</div>';
+        try {
+            const res = await this.api('/api/templates/manage/list');
+            const rows = res.data || [];
+            if (!rows.length) {
+                container.innerHTML = '<div class="text-center py-6 text-gray-400">暂无模板</div>';
+                return;
+            }
+            container.innerHTML = rows.map(t => `
+                <div class="flex justify-between items-center border border-gray-200 rounded-lg p-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium text-gray-900">${this.escapeHtml(t.name)}</span>
+                            <span class="tag" style="background:${t.is_builtin ? '#e0e7ff' : '#fef3c7'};color:${t.is_builtin ? '#3730a3' : '#92400e'}">
+                                ${t.is_builtin ? '内置' : '自定义'}
+                            </span>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">${this.escapeHtml(t.description || '')} <span class="text-gray-300">(${t.id})</span></div>
+                    </div>
+                    <button onclick="app.deleteTemplate('${t.id}', '${this.escapeHtml(t.name)}')" class="btn btn-sm btn-icon" ${t.is_builtin ? 'disabled' : ''} style="background:${t.is_builtin ? 'transparent' : '#fee2e2'};color:${t.is_builtin ? '#d1d5db' : '#dc2626'}" title="${t.is_builtin ? '内置模板不可删除' : '删除'}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+        } catch (e) {
+            container.innerHTML = `<div class="text-center py-4 text-red-500">加载失败: ${this.escapeHtml(e.message)}</div>`;
+        }
+    },
+
+    async deleteTemplate(id, name) {
+        if (!confirm(`确定删除模板「${name}」吗？`)) return;
+        try {
+            const res = await this.api(`/api/templates/${id}`, { method: 'DELETE' });
+            if (res.success) {
+                this.showToast('模板已删除');
+                await this.loadTemplates();
+                this.showTemplateManage();
+            } else {
+                this.showToast(res.message || '删除失败', 'error');
+            }
+        } catch (e) {
+            this.showToast('删除失败: ' + e.message, 'error');
+        }
+    },
+
     // === Papers ===
     async loadPapers() {
         const res = await this.api('/api/papers');

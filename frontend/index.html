@@ -123,6 +123,9 @@
                         <div class="card-header">
                             <h2 class="card-title">我的论文</h2>
                             <div class="flex gap-2">
+                                <button onclick="app.showTemplateManage()" class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-th-large"></i> 模板管理
+                                </button>
                                 <button onclick="app.showModal('modal-upload-template')" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-upload"></i> 上传模板
                                 </button>
@@ -243,6 +246,27 @@
             <div class="modal-footer">
                 <button onclick="app.closeModal('modal-new-paper')" class="btn btn-secondary">取消</button>
                 <button onclick="app.confirmCreatePaper()" class="btn btn-primary">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模板管理弹窗 -->
+    <div id="modal-template-manage" class="modal-overlay hidden">
+        <div class="modal modal-lg">
+            <div class="modal-header flex justify-between items-center">
+                <h3 class="modal-title">模板管理</h3>
+                <button onclick="app.closeModal('modal-template-manage')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="template-manage-list" class="space-y-2">
+                    <div class="text-center py-4 text-gray-400">加载中...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="app.showModal('modal-upload-template')" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-upload"></i> 上传新模板
+                </button>
+                <button onclick="app.closeModal('modal-template-manage')" class="btn btn-secondary">关闭</button>
             </div>
         </div>
     </div>

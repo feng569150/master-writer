@@ -57,6 +57,31 @@ class TemplateEngineTest(unittest.TestCase):
         result = TemplateEngine.list_all()
         self.assertGreaterEqual(len(result), 3)
 
+    def test_delete_custom_template(self):
+        """自定义模板可删除"""
+        async def _run():
+            await TemplateEngine.create_custom(
+                "test_custom_tpl", "测试模板", TemplateParser.get_default_template()
+            )
+            self.assertIsNotNone(TemplateEngine.get("test_custom_tpl"))
+            await TemplateEngine.delete_custom("test_custom_tpl")
+            return TemplateEngine.get("test_custom_tpl")
+
+        result = asyncio.run(_run())
+        self.assertIsNone(result, "删除后不应再存在")
+
+    def test_cannot_delete_builtin(self):
+        """内置模板不可删除"""
+        async def _run():
+            try:
+                await TemplateEngine.delete_custom("default")
+                return False
+            except ValueError:
+                return True
+
+        self.assertTrue(asyncio.run(_run()), "内置模板删除应抛异常")
+        self.assertIsNotNone(TemplateEngine.get("default"), "内置模板应保留")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

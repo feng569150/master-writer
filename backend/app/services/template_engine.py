@@ -87,11 +87,28 @@ class TemplateEngine:
         """创建自定义模板"""
         if template_id in cls._templates:
             raise ValueError(f"模板 {template_id} 已存在")
-        
+
         await db.create_template(template_id, name, config, is_builtin=False)
         template = TemplateConfig(**config)
         cls._templates[template_id] = template
         return template
+
+    @classmethod
+    async def delete_custom(cls, template_id: str):
+        """删除自定义模板（内置模板禁止删除）"""
+        template = cls._templates.get(template_id)
+        if not template:
+            raise ValueError(f"模板 {template_id} 不存在")
+        try:
+            await db.delete_template(template_id)
+        except ValueError as e:
+            raise e
+        cls._templates.pop(template_id, None)
+
+    @classmethod
+    async def list_raw(cls):
+        """列出带内置标记的原始信息（用于前端管理）"""
+        return await db.list_templates()
 
 
 # 内置模板 JSON 文件内容（将由 create_templates 创建）
